@@ -1,5 +1,11 @@
 # Changelog
 
+## Lab fix: erasing the head froze the editor
+- **Cause:** the renderer's shape cache (spine, triangles) was keyed only by the body object. The Lab edits bodies in place, so after erasing a joint the cache pointed at joints that no longer existed; the exception stopped the Lab's drawing loop, so the canvas froze and new joints seemed impossible to place. Reproduced on Lash, Oar, Rotor and Buoy.
+- **Fixes:** shape analysis moved to `src/render/anatomy.ts`, cached by object plus a signature of its contents and safe for half-built bodies (no bones, loose joints, bad head index). The Lab draw loop can no longer die from one bad frame. Erasing the head moves it to the nearest joint and says so.
+- **Related fixes:** clicks that used to do nothing silently now explain why (outside the build circle, joint/bone/muscle limits, last joint, already connected, Test swim on an invalid body). Bone and Muscle work by click-then-click as well as drag. Ctrl/Cmd+Z undoes; Escape stops a test swim.
+- Tests: 34 (new `tests/anatomy.test.ts`). New `scripts/lab-regression.mjs`: on the default body and all 8 templates, erase the head, add a joint, link it; fails on any page error. It fails on the old code and passes now.
+
 ## Stage 4: smoother motion, champion roster, share links, clips
 - **Jitter fix, measured.** Champions flipped muscles fully on 10–23% of ticks. Now: muscle response time (`PHYS.muscleResponse` 0.5; 0.25 was smoother but stopped tail-swimmers pushing), effort cost 0.1 → 0.3 (Pincer body jerk −35% with no loss of push-outs), and ~40 ms display-only smoothing of drawn joints and stretch. Physics fingerprint updated deliberately.
 - **Champion roster** (`scripts/train-all.sh`, `scripts/build-roster.ts`, `src/data/roster.json`): 7 champions, 60–80 generations each, chosen on fresh seeds with push-outs weighted double; personality lines generated from measured stats (Buoy win/push rate, round-robin win rate). Bell honestly ranks last (its body plan never pushes).

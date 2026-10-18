@@ -244,6 +244,16 @@ results bit for bit (the fingerprint test proves it), about 2.5× faster trainin
   every joint is attached to the body. Muscles alone don't hold a body together.
 - **Test swim** spawns the body in a private physics world and drives every muscle with a sine wave,
   phase-shifted per muscle, so you see whether the shape can move at all before evolving a brain.
+- **A bug worth learning from: the stale cache.** The renderer caches facts about a body's shape
+  (its spine, its triangles) so it doesn't recompute them 60 times a second. The cache was keyed
+  only by *which object* the body was. But the Lab edits that object *in place*: erasing a joint
+  renumbers every joint after it. The cache kept handing back a spine that pointed at joint 6 of a
+  6-joint body (indices run 0–5), the code read `undefined[0]`, and the exception killed the
+  drawing loop, so the editor froze and looked like it ignored clicks. Two fixes
+  (`src/render/anatomy.ts`, `src/ui/lab.ts`): the cache now also stores a *signature* of the
+  body's contents and recomputes when it changes, and the draw loop schedules its next frame
+  *before* drawing, inside `try/catch`, so one bad frame can't freeze the editor. In C++ terms
+  this is iterator invalidation: holding an index into a container someone else just resized.
 
 ### Saving (`src/ui/save.ts`)
 `localStorage` is a small key-value store in the browser. We save the body and the champion's

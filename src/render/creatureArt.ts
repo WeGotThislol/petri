@@ -20,6 +20,7 @@
  */
 import type { CreatureSpec, Look } from '../sim/creature';
 import { Rng } from '../sim/rng';
+import { Anatomy, anatomy } from './anatomy';
 import { COLOR, mix, rgba } from '../ui/tokens';
 
 /** What the creature is sensing right now, each 0..1 (drives the sensor lights). */
@@ -49,56 +50,6 @@ let rimCanvas: HTMLCanvasElement | null = null;
 /** Easter egg: brighter bioluminescence. Returns the new state. */
 let lumBoost = 1;
 export function toggleBioluminescence(): boolean { lumBoost = lumBoost === 1 ? 1.8 : 1; return lumBoost !== 1; }
-
-/** Precomputed facts about a body's shape (cached per spec). */
-interface Anatomy {
-  tris: [number, number, number][]; // stiff triangles of bones = the core
-  core: boolean[];
-  degree: number[];
-  /** Joints ordered from head to the far end: the path the neural pulse travels. */
-  spine: number[];
-  /** Joints that carry sensor lights: [opponent sensor, edge sensors…]. */
-  sensors: { opp: number; edges: number[]; touch: number[] };
-  /** Widest radius of the swept torso. */
-  torsoR: number;
-}
-const anatomyCache = new WeakMap<CreatureSpec, Anatomy>();
-
-function anatomy(spec: CreatureSpec): Anatomy {
-  let a = anatomyCache.get(spec);
-  if (a) return a;
-  const key = (i: number, j: number) => `${Math.min(i, j)}-${Math.max(i, j)}`;
-  const has = new Set(spec.bones.map((b) => key(b.a, b.b)));
-  const n = spec.joints.length;
-  const tris: [number, number, number][] = [];
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) for (let k = j + 1; k < n; k++)
-    if (has.has(key(i, j)) && has.has(key(j, k)) && has.has(key(i, k))) tris.push([i, j, k]);
-  const core = new Array(n).fill(false);
-  for (const t of tris) for (const k of t) core[k] = true;
-  if (!tris.length) core[spec.head] = true;
-  const degree = new Array(n).fill(0);
-  for (const b of spec.bones) { degree[b.a]++; degree[b.b]++; }
-  // Spine: breadth-first distances from the head, then the longest chain to a far joint.
-  const adj: number[][] = Array.from({ length: n }, () => []);
-  for (const b of spec.bones) { adj[b.a].push(b.b); adj[b.b].push(b.a); }
-  const dist = new Array(n).fill(-1), prev = new Array(n).fill(-1);
-  dist[spec.head] = 0;
-  const q = [spec.head];
-  while (q.length) { const u = q.shift()!; for (const v of adj[u]) if (dist[v] < 0) { dist[v] = dist[u] + 1; prev[v] = u; q.push(v); } }
-  const h = spec.joints[spec.head];
-  let far = spec.head, best = -1;
-  spec.joints.forEach((j, k) => { const d = Math.hypot(j.x - h.x, j.y - h.y); if (d > best) { best = d; far = k; } });
-  const spine: number[] = [];
-  for (let k = far; k >= 0; k = prev[k]) spine.unshift(k);
-  // Sensors: opponent sense at the head; edge senses on the two core joints furthest sideways.
-  const side = spec.joints.map((j, k) => ({ k, y: j.y })).filter((o) => core[o.k] && o.k !== spec.head).sort((p, q2) => p.y - q2.y);
-  const edges = side.length >= 2 ? [side[0].k, side[side.length - 1].k] : side.map((o) => o.k);
-  const touch = spec.joints.map((_, k) => k).filter((k) => degree[k] === 1).slice(0, 2);
-  const torsoR = Math.max(...spec.joints.map((j, k) => (core[k] ? j.r : 0))) * 1.75;
-  a = { tris, core, degree, spine, sensors: { opp: spec.head, edges, touch }, torsoR };
-  anatomyCache.set(spec, a);
-  return a;
-}
 
 /** Skin radius at joint k: full in the core, slimmer on limbs, tapering at tips. */
 function skinR(spec: CreatureSpec, an: Anatomy, k: number): number {
@@ -186,7 +137,7 @@ export function drawCreature(ctx: CanvasRenderingContext2D, spec: CreatureSpec, 
   view(g);
 
   // Axis of the body (head → far end), used by markings and the pulse.
-  const head = P[spec.head], tail = P[an.spine[an.spine.length - 1]];
+  const head = P[an.sensors.opp] ?? P[0], tail = P[an.spine[an.spine.length - 1]] ?? head;
   let ax = head[0] - tail[0], ay = head[1] - tail[1];
   const alen = Math.hypot(ax, ay) || 1; ax /= alen; ay /= alen;
 

@@ -20,15 +20,18 @@ type Tool = 'joint' | 'bone' | 'muscle' | 'head' | 'erase';
 const GRID = 6;
 const TOOL_HELP: Record<Tool, string> = {
   joint: 'Click empty space to add a joint. Drag a joint to move it.',
-  bone: 'Drag from one joint to another to join them with a rigid bone.',
-  muscle: 'Drag between two joints to add a muscle. Muscles should span a joint, like a real one.',
+  bone: 'Drag from one joint to another (or click both) to join them with a rigid bone.',
+  muscle: 'Drag between two joints (or click both) to add a muscle. Muscles should span a joint, like a real one.',
   head: 'Click the joint that should lead. The brain\'s sense of "forward" comes from here.',
   erase: 'Click a joint, bone or muscle to remove it.',
 };
 
 export class LabEditor {
   spec: CreatureSpec;
-  tool: Tool = 'joint';
+  private _tool: Tool = 'joint';
+  get tool(): Tool { return this._tool; }
+  /** Changing tool drops any half-finished link. */
+  set tool(t: Tool) { this._tool = t; this.drag = null; }
   onChange: () => void = () => {};
   private undoStack: string[] = [];
   private canvas: HTMLCanvasElement;
@@ -51,28 +54,48 @@ export class LabEditor {
     this.canvas.addEventListener('pointerdown', this.down);
     this.canvas.addEventListener('pointermove', this.move);
     window.addEventListener('pointerup', this.up);
+    window.addEventListener('keydown', this.key);
     new ResizeObserver(() => this.resize()).observe(this.canvas);
     this.resize();
     this.raf = requestAnimationFrame(this.frame);
   }
 
-  dispose(): void { cancelAnimationFrame(this.raf); window.removeEventListener('pointerup', this.up); }
+  dispose(): void {
+    cancelAnimationFrame(this.raf);
+    window.removeEventListener('pointerup', this.up);
+    window.removeEventListener('keydown', this.key);
+  }
+
+  /** Ctrl/Cmd+Z undoes; Escape stops a test swim. */
+  private key = (e: KeyboardEvent) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undo(); }
+    if (e.key === 'Escape') this.stopTest();
+  };
 
   get errors(): string[] { return validateSpec(this.spec); }
-  get help(): string { return TOOL_HELP[this.tool]; }
+  /** A short message explaining why an edit didn't happen (shown instead of the tool help). */
+  private notice = '';
+  private noticeUntil = 0;
+  get help(): string { return performance.now() < this.noticeUntil ? this.notice : TOOL_HELP[this.tool]; }
+  private tell(msg: string): void {
+    this.notice = msg; this.noticeUntil = performance.now() + 3500; this.onChange();
+    setTimeout(() => this.onChange(), 3600);   // put the tool help back afterwards
+  }
   get testing(): boolean { return !!this.preview; }
 
   // ------------------------------------------------------------- edits
   private commit(mutate: () => void): void {
     this.undoStack.push(JSON.stringify(this.spec));
     if (this.undoStack.length > 60) this.undoStack.shift();
+    if (this.drag?.kind === 'link') this.drag = null;   // joint indices may be about to change
     mutate();
     this.spec.name = speciesName(this.spec, this.nameSeed);
     this.onChange();
   }
   undo(): void {
     const s = this.undoStack.pop();
-    if (s) { this.spec = JSON.parse(s); this.onChange(); }
+    if (s) { this.drag = null; this.spec = JSON.parse(s); this.onChange(); }
   }
   get canUndo(): boolean { return this.undoStack.length > 0; }
 
@@ -94,15 +117,15 @@ export class LabEditor {
   rerollName(): void { this.nameSeed++; this.spec.name = speciesName(this.spec, this.nameSeed); this.onChange(); }
 
   private addJoint(x: number, y: number): void {
-    if (this.spec.joints.length >= LIMITS.maxJoints) return;
+    if (this.spec.joints.length >= LIMITS.maxJoints) { this.tell(`That's the limit: ${LIMITS.maxJoints} joints. Erase one to add another.`); return; }
     this.commit(() => { this.spec.joints.push({ x, y, r: 8 }); });
   }
   private link(a: number, b: number, kind: 'bone' | 'muscle'): void {
     if (a === b) return;
     const has = (list: { a: number; b: number }[]) => list.some((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a));
-    if (has(this.spec.bones) || has(this.spec.muscles)) return;
-    if (kind === 'bone' && this.spec.bones.length >= LIMITS.maxBones) return;
-    if (kind === 'muscle' && this.spec.muscles.length >= LIMITS.maxMuscles) return;
+    if (has(this.spec.bones) || has(this.spec.muscles)) { this.tell('Those two joints are already connected.'); return; }
+    if (kind === 'bone' && this.spec.bones.length >= LIMITS.maxBones) { this.tell(`That's the limit: ${LIMITS.maxBones} bones.`); return; }
+    if (kind === 'muscle' && this.spec.muscles.length >= LIMITS.maxMuscles) { this.tell(`That's the limit: ${LIMITS.maxMuscles} muscles.`); return; }
     this.commit(() => {
       if (kind === 'bone') this.spec.bones.push({ a, b });
       else this.spec.muscles.push({ a, b, strength: 0.8 });
@@ -111,15 +134,23 @@ export class LabEditor {
   private eraseAt(x: number, y: number): void {
     const j = this.jointAt(x, y);
     if (j >= 0) {
-      if (this.spec.joints.length <= 1) return;
+      if (this.spec.joints.length <= 1) { this.tell('A body needs at least one joint. Use "Blank" to start over.'); return; }
+      const wasHead = this.spec.head === j;
       this.commit(() => {
         const s = this.spec;
+        const old = s.joints[j];
         const re = (i: number) => (i > j ? i - 1 : i);
         s.joints.splice(j, 1);
         s.bones = s.bones.filter((b) => b.a !== j && b.b !== j).map((b) => ({ a: re(b.a), b: re(b.b) }));
         s.muscles = s.muscles.filter((m) => m.a !== j && m.b !== j).map((m) => ({ ...m, a: re(m.a), b: re(m.b) }));
-        s.head = s.head === j ? 0 : re(s.head);
+        if (wasHead) {
+          // The head moves to the nearest remaining joint, so "forward" stays roughly where it was.
+          let best = 0, bd = Infinity;
+          s.joints.forEach((q, k) => { const d = Math.hypot(q.x - old.x, q.y - old.y); if (d < bd) { bd = d; best = k; } });
+          s.head = best;
+        } else s.head = re(s.head);
       });
+      if (wasHead) this.tell('The head moved to the nearest joint. Use the Head tool to choose another.');
       return;
     }
     const m = this.segmentAt(this.spec.muscles, x, y);
@@ -130,7 +161,7 @@ export class LabEditor {
 
   // ------------------------------------------------------------- test swim
   startTest(): void {
-    if (this.errors.length) return;
+    if (this.errors.length) { this.tell(`Can't swim yet: ${this.errors[0]}`); return; }
     const world = new World();
     const c = spawn(world, this.spec, 0, 0, 0, 0, false);
     this.preview = { world, parts: c.particles, muscles: c.muscles, t: 0 };
@@ -169,8 +200,15 @@ export class LabEditor {
       case 'joint':
         if (j >= 0) { this.undoStack.push(JSON.stringify(this.spec)); this.drag = { kind: 'move', joint: j, ...p }; }
         else if (Math.hypot(p.x, p.y) < LIMITS.radius) this.addJoint(this.snap(p.x), this.snap(p.y));
+        else this.tell('Joints go inside the circle.');
         break;
       case 'bone': case 'muscle':
+        // Second click of a click-click link: finish it on a joint, cancel anywhere else.
+        if (this.drag?.kind === 'link') {
+          const from = this.drag.joint; this.drag = null;
+          if (j >= 0 && j !== from) this.link(from, j, this.tool);
+          break;
+        }
         if (j >= 0) this.drag = { kind: 'link', joint: j, ...p };
         break;
       case 'head':
@@ -194,13 +232,19 @@ export class LabEditor {
     }
   };
   private up = (e: PointerEvent) => {
-    const d = this.drag; this.drag = null;
+    const d = this.drag;
     if (!d) return;
     if (d.kind === 'link') {
       const p = this.toWorld(e);
       const j = this.jointAt(p.x, p.y);
+      // Released on the joint it started from: that was a click, so keep the link pending
+      // and let the next click choose the other end (drag OR click-click both work).
+      if (j === d.joint) return;
+      this.drag = null;
       if (j >= 0) this.link(d.joint, j, this.tool === 'muscle' ? 'muscle' : 'bone');
+      return;
     }
+    this.drag = null;
   };
 
   // ------------------------------------------------------------- drawing
@@ -214,9 +258,12 @@ export class LabEditor {
 
   private frame = (now: number) => {
     const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now;
-    this.draw(dt);
+    // Schedule the next frame FIRST, so one bad frame can never freeze the editor.
     this.raf = requestAnimationFrame(this.frame);
+    try { this.draw(dt); }
+    catch (e) { if (!this.drawFailed) { this.drawFailed = true; console.error('Lab draw failed', e); } }
   };
+  private drawFailed = false;
 
   private draw(dt: number): void {
     const g = this.ctx;
@@ -261,7 +308,7 @@ export class LabEditor {
       g.beginPath(); g.arc(j.x, j.y, Math.max(3.5, j.r * 0.45), 0, Math.PI * 2); g.fill(); g.stroke();
     });
     if (this.drag?.kind === 'link') {
-      const a = s.joints[this.drag.joint];
+      const a = s.joints[this.drag.joint] ?? s.joints[0];
       g.strokeStyle = this.tool === 'muscle' ? COLOR.amber : COLOR.bone; g.lineWidth = 1.2 * px; g.setLineDash([3 * px, 3 * px]);
       g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(this.drag.x, this.drag.y); g.stroke(); g.setLineDash([]);
     }
