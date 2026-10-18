@@ -59,6 +59,8 @@ export function evaluate(job: EvalJob, genome: ArrayLike<number>): EvalResult {
 }
 
 // ---- anti-cheat thresholds ----
+/** Effort cost weight: higher = smoother, calmer motion (0.3 roughly halves visible jerk without costing push-outs). */
+export const TUNING = { effort: 0.3 };
 const EXPLOIT_HITS = 3;        // speed-cap hits in one match → it found a physics glitch
 const IDLE_PATH = 0.6;         // travelled less than 0.6 × ring radius in a whole match → couch potato
 const CAMP_FRACTION = 0.7;     // spent >70% of the match in the middle third…
@@ -118,7 +120,7 @@ export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponen
   score += shaping * 0.15 * (closeness / Math.max(1, samples));
   // A small cost for frantic twitching: smoother, more natural motion, and less
   // incentive to farm integration error the way Karl Sims' swimmers did.
-  score -= 0.1 * (twitch / Math.max(1, m.tick));
+  score -= TUNING.effort * (twitch / Math.max(1, m.tick));
 
   let flag: MatchScore['flag'] = null;
   if (path < IDLE_PATH * RING_RADIUS) { score -= 0.2; flag = 'idle'; }

@@ -15,8 +15,8 @@ await page.goto(url + '?manual', { waitUntil: 'networkidle' });
 
 const fail = (msg) => { console.error('FAIL:', msg); process.exitCode = 1; };
 
-// 1. Determinism: step the page's own seed-1 match 400 ticks and compare hashes.
-const hash = await page.evaluate(() => { const m = window.petri.match; for (let i = 0; i < 400; i++) m.step(); return m.stateHash(); });
+// 1. Determinism: build the golden-test match inside the browser, step it 400 ticks, compare hashes.
+const hash = await page.evaluate(() => { const m = window.petri.goldenMatch(); for (let i = 0; i < 400; i++) m.step(); return m.stateHash(); });
 hash === golden ? console.log(`ok  browser hash ${hash} == node hash`) : fail(`browser hash ${hash} != node hash ${golden}`);
 
 // 2. The game advances and the canvas is not blank.

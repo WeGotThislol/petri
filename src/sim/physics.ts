@@ -60,6 +60,7 @@ export const PHYS = {
   density: 0.02,      // mass = density * r^2
   maxSpeed: 900,      // speed cap; anything faster is clamped (anti-exploit)
   iterations: 4,      // constraint solver passes per substep
+  muscleResponse: 0.5,  // share of the gap between commanded and actual muscle activation closed per tick
 };
 
 export class World {

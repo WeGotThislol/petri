@@ -1,5 +1,16 @@
 # Changelog
 
+## Stage 4: smoother motion, champion roster, share links, clips
+- **Jitter fix, measured.** Champions flipped muscles fully on 10–23% of ticks. Now: muscle response time (`PHYS.muscleResponse` 0.5; 0.25 was smoother but stopped tail-swimmers pushing), effort cost 0.1 → 0.3 (Pincer body jerk −35% with no loss of push-outs), and ~40 ms display-only smoothing of drawn joints and stretch. Physics fingerprint updated deliberately.
+- **Champion roster** (`scripts/train-all.sh`, `scripts/build-roster.ts`, `src/data/roster.json`): 7 champions, 60–80 generations each, chosen on fresh seeds with push-outs weighted double; personality lines generated from measured stats (Buoy win/push rate, round-robin win rate). Bell honestly ranks last (its body plan never pushes).
+- Roster everywhere: the home background is now a real evolved bout (field note updated), the pick screen plays a trained example of the chosen species, the Evolve screen has "Watch a trained one", and all 7 are opponents.
+- **Share links** (`src/share/codec.ts`): body + 8-bit-quantised brain in ~400–490 characters after `#c=`; nothing uploaded. Opening a link shows a challenge screen; strangers are guided to evolve a challenger, returning players fight it immediately.
+- **Clip export** (`src/share/clip.ts`): replays the bout by seed while `MediaRecorder` captures the canvas with a caption; H.264 MP4 where available, else WebM; UI hides while recording.
+- Opponent picker is now a grouped select (control, from a link, your lineage, roster) with the opponent's description.
+- Resumed lineages keep their real generation count; "1 generation" grammar.
+- `docs/IDEAS.md`: brainstorm for growing Petri beyond sumo.
+- Tests: 32 (new: share codes). New walkthrough `scripts/stage4-flow.mjs` (verifies a real clip downloads and both link flows). The e2e determinism check now builds its match explicitly.
+
 ## Stage 3: research pass, the Lab, full Evolve and Fight screens
 - Research pass (`docs/RESEARCH.md`, `docs/CREDITS.md`): OpenAI multi-agent sumo, Karl Sims, NEAT, Lehman et al., and 7 hobby projects. No code copied; licences recorded.
 - Engine changes from the research: hall-of-fame opponents sampled from the recent half + whole history; shaping bonuses annealed to a 0.3 floor over 20 generations; start-position randomisation curriculum (30% → 100%); small effort cost for twitching. 30-generation proof: push-outs vs the Buoy reach 65–90% by gens 24–29 (was 35%); the chart was regenerated.

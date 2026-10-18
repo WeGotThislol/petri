@@ -18,7 +18,7 @@ const DISH_RADIUS = RING_RADIUS + 46;
 interface Mote { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number; color: string; kind: 'silt' | 'spark' }
 
 /** Per-creature cosmetic state, smoothed so the lights breathe instead of flicker. */
-interface Look { senses: Senses; activity: number; drift: { x: number; y: number; vx: number; vy: number } }
+interface Look { senses: Senses; activity: number; drift: { x: number; y: number; vx: number; vy: number }; smooth: [number, number][] | null; vel: { x: number; y: number } }
 
 export interface View { cx: number; cy: number; fill: number } // dish centre as a fraction of the canvas, and a size factor
 
@@ -40,6 +40,8 @@ export class Renderer {
   view: View = { cx: 0.5, cy: 0.5, fill: 1 };
   /** Easter egg: dims the room. */
   nightDive = false;
+  /** Title card burned into the picture (used when recording clips). */
+  caption: { title: string; sub: string } | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -162,6 +164,7 @@ export class Renderer {
     const v = ctx.createRadialGradient(this.w / 2, this.h / 2, Math.min(this.w, this.h) * 0.35, this.w / 2, this.h / 2, Math.max(this.w, this.h) * 0.75);
     v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, `rgba(0,0,0,${this.nightDive ? 0.75 : 0.45})`);
     ctx.fillStyle = v; ctx.fillRect(0, 0, this.w, this.h);
+    if (this.caption) this.drawCaption(m);
   }
 
   private drawDish(m: Match | null, dt: number): void {
@@ -222,6 +225,13 @@ export class Renderer {
     const c = m.creatures[i];
     const L = this.looks[i];
     let pts = c.particles.map((pi) => this.pos(m, pi, alpha));
+    // Display-only smoothing: a ~40 ms low-pass on drawn joint positions removes
+    // single-frame shimmer from contacts and stiff limbs. The simulation (and every
+    // replay) is untouched; only what you see is eased.
+    const k = 1 - Math.exp(-dt * 25);
+    if (!L.smooth || L.smooth.length !== pts.length || dt === 0) L.smooth = pts.map(([x, y]) => [x, y]);
+    else L.smooth = L.smooth.map(([x, y], j) => [x + (pts[j][0] - x) * k, y + (pts[j][1] - y) * k]);
+    pts = L.smooth.map(([x, y]) => [x, y]);
     const lost = !!m.result && m.result.winner === 1 - i;
     const won = !!m.result && m.result.winner === i;
     if (lost) {
@@ -231,8 +241,9 @@ export class Renderer {
       pts = pts.map(([x, y]) => [x + L.drift.x, y + L.drift.y]);
     }
     const com = m.com(i);
+    L.vel.x += (com.vx - L.vel.x) * k; L.vel.y += (com.vy - L.vel.y) * k; // smoothed, for the stretch
     drawCreature(this.ctx, c.spec, {
-      pts, vel: lost ? undefined : { x: com.vx, y: com.vy }, time: this.time + i * 0.37,
+      pts, vel: lost ? undefined : L.vel, time: this.time + i * 0.37,
       senses: L.senses, activity: L.activity, state: lost ? 'ko' : won ? 'winner' : 'normal', glow: this.glow[i],
     }, this.scale * this.dpr);
   }
@@ -268,6 +279,29 @@ export class Renderer {
     this.motes = this.motes.filter((p) => p.life > 0);
   }
 
+  /** A quiet title card for recorded clips: names, clock and a small wordmark. */
+  private drawCaption(m: Match | null): void {
+    const { ctx } = this;
+    const c = this.caption!;
+    const pad = Math.max(18, this.w * 0.03);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = rgba(COLOR.bone, 0.92);
+    ctx.font = `500 ${Math.round(Math.max(20, this.w * 0.026))}px ${FONT.display}`;
+    ctx.fillText(c.title, pad, this.h - pad - 18);
+    ctx.fillStyle = rgba(COLOR.inkSoft, 0.85);
+    ctx.font = `600 ${Math.round(Math.max(10, this.w * 0.009))}px ${FONT.ui}`;
+    ctx.fillText(c.sub.toUpperCase().split('').join(String.fromCharCode(8202)), pad, this.h - pad);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = rgba(COLOR.bone, 0.75);
+    ctx.font = `500 ${Math.round(Math.max(18, this.w * 0.02))}px ${FONT.display}`;
+    ctx.fillText('Petri', this.w - pad, this.h - pad);
+    if (m) {
+      ctx.fillStyle = rgba(COLOR.inkSoft, 0.8);
+      ctx.font = `${Math.round(Math.max(11, this.w * 0.01))}px ${FONT.mono}`;
+      ctx.fillText(`${m.time.toFixed(1)} s`, this.w - pad, pad + 10);
+    }
+  }
+
   /** Marks the player's specimen: a fine amber bracket and a faint marginal note. */
   private drawYou(m: Match, i: number, alpha: number): void {
     const { ctx } = this;
@@ -289,4 +323,4 @@ export class Renderer {
   }
 }
 
-function newLook(): Look { return { senses: { opponent: 0, edge: 0, touch: 0 }, activity: 0.2, drift: { x: 0, y: 0, vx: 0, vy: 0 } }; }
+function newLook(): Look { return { senses: { opponent: 0, edge: 0, touch: 0 }, activity: 0.2, drift: { x: 0, y: 0, vx: 0, vy: 0 }, smooth: null, vel: { x: 0, y: 0 } }; }

@@ -3,18 +3,20 @@
 Choose an organism, evolve its neural-network brain by natural selection,
 then push rivals out of the dish.
 
-*Work in progress: Stage 3 of 6 done.* **Play it:** https://wegotthislol.github.io/petri/ · See [docs/PLAN.md](docs/PLAN.md) for the plan
+*Work in progress: Stage 4 of 6 done.* **Play it:** https://wegotthislol.github.io/petri/ · See [docs/PLAN.md](docs/PLAN.md) for the plan
 and [docs/LEARN.md](docs/LEARN.md) for a beginner-friendly tour.
 
 ![Home screen](docs/img/v2-home.png)
 
-![Mid-fight](docs/img/v2-fight.png)
+![Two roster champions, both evolved](docs/img/stage4-roster-bout.gif)
 
 ![The Lab](docs/img/stage3-lab.png)
 
 **Evolution really works:** every generation's champion, tested on fresh seeds.
 
 ![Proof chart](docs/img/stage2-proof.svg)
+
+Share a creature: every specimen fits in a link (~450 characters, nothing uploaded). Record a replay clip of any fight.
 
 Research notes: [docs/RESEARCH.md](docs/RESEARCH.md) · credits: [docs/CREDITS.md](docs/CREDITS.md)
 
@@ -30,4 +32,6 @@ npm run build    # production build into dist/
 npm run e2e      # browser smoke test (needs `npm run dev` running)
 node scripts/first-run.mjs   # first-time-visitor walkthrough with screenshots
 node scripts/stage3-flow.mjs # Lab → evolve → fight → adopt → save walkthrough
+node scripts/stage4-flow.mjs # roster, share link, clip export, challenge walkthrough
+./scripts/train-all.sh && npx tsx scripts/build-roster.ts   # retrain the champion roster (~10 min)
 ```

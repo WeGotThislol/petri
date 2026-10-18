@@ -253,6 +253,44 @@ champion and mutated copies of it.
 
 ---
 
+## 7. Stage 4: smoother motion, a roster, share links and clips
+
+### Why the creatures jittered, and the fix
+Evolved brains love *bang-bang control*: slamming a muscle from fully contracted to fully
+extended in one tick. We measured it: champions did a full flip on 10–23% of all ticks.
+Three fixes, each measured (`scripts/` experiments, numbers in CHANGELOG):
+1. **Muscle response time** (`PHYS.muscleResponse = 0.5`): each tick the real activation closes half the
+   gap to the brain's command, like real muscle. We tried 0.25 first: smoother, but tail-swimmers
+   could no longer push (Lash: 0–6 push-outs in 10). 0.5 kept pushing strong (9 in 10).
+2. **A bigger effort cost** in fitness (0.1 → 0.3): evolution itself now prefers calm commands.
+   Pincer's body jerk dropped by a third with no loss of push-outs.
+3. **Display smoothing**: the renderer eases drawn joint positions over ~40 ms. Only the picture
+   changes; the simulation, and therefore every replay and share link, is untouched.
+*Lesson:* when a fix trades one quality for another, measure both before deciding.
+
+### The champion roster (`scripts/train-all.sh`, `scripts/build-roster.ts`)
+Each body plan is evolved offline (64 variants × 80 generations, four in parallel, one per CPU core).
+From the last 20 champions we keep the one that does best on fresh seeds, counting real
+push-outs double. `build-roster.ts` then measures each champion against the Buoy and in a round
+robin against each other, and writes its personality line *from those numbers*. The roster is the
+home-screen background, the example shown behind the pick screen, and a list of opponents.
+
+### Share links (`src/share/codec.ts`)
+A creature is packed into bytes: joint positions as 16-bit integers, bone and muscle pairs as
+4-bit nibbles (≤12 joints fit), colours as indices, and the brain's weights **quantised** to 8 bits
+each (a weight ≈ q × scale, with one shared float `scale`). That's ~250–340 bytes, base64url-encoded
+into ~400–490 characters after `#c=`. Because everything after `#` never reaches a server,
+nothing is uploaded: the link *is* the creature. Fights use the decoded (quantised) brain, so the
+sender and every receiver see exactly the same fight.
+*C++ analogy:* it's like `memcpy`-ing a packed struct into a byte buffer, then hex-encoding it.
+
+### Clips (`src/share/clip.ts`)
+`canvas.captureStream()` turns the canvas into a video track and `MediaRecorder` encodes it (MP4 where
+supported, else WebM). We don't record the live fight: we **replay** it, same creatures and same seed,
+with a caption drawn in, and download the result. Determinism makes this free.
+
+---
+
 ## Glossary
 
 ### Git terms
@@ -289,6 +327,10 @@ champion and mutated copies of it.
 - **Headless** — running without a visible window or screen.
 - **requestAnimationFrame** — asks the browser to call your function before the next screen repaint; the heartbeat of a web game loop.
 - **devicePixelRatio** — how many physical pixels per CSS pixel (2 on most phones); we scale the canvas so it stays sharp.
+- **Quantisation** — storing a number with fewer bits (here 8), accepting a small rounding error.
+- **base64url** — writing bytes as URL-safe text (A–Z, a–z, 0–9, '-', '_').
+- **URL fragment (#…)** — the part after '#'; browsers never send it to the server.
+- **MediaRecorder** — browser API that encodes a media stream (e.g. a canvas) into a video file.
 - **localStorage** — a per-site key-value store in the browser; survives reloads, not shared between devices.
 - **Curriculum** — training that starts easy and gets harder (or less helped) over time.
 - **Hall of fame / self-play** — training against copies of your own past champions.

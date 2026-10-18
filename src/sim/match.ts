@@ -97,7 +97,13 @@ export class Match {
       this.sense(i);
       this.controllers[i].act(this.inputs[i], this.outputs[i]);
       const c = this.creatures[i];
-      for (let m = 0; m < c.muscles.length; m++) this.world.muscles[c.muscles[m]].act = this.outputs[i][m];
+      // Muscles have a response time: the activation moves part of the way toward the
+      // brain's command each tick instead of snapping to it. Real muscle works like
+      // this, and it turns twitchy bang-bang commands into smooth, weighty strokes.
+      for (let m = 0; m < c.muscles.length; m++) {
+        const mu = this.world.muscles[c.muscles[m]];
+        mu.act += (this.outputs[i][m] - mu.act) * PHYS.muscleResponse;
+      }
     }
     this.world.step(TICK, SUBSTEPS);
     this.contacts = this.world.contacts;

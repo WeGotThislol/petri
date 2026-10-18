@@ -107,4 +107,4 @@ describe('sumo rules', () => {
   });
 });
 
-export const GOLDEN_HASH_SEED1_400 = '512d0462';
+export const GOLDEN_HASH_SEED1_400 = 'ae2e5768';

@@ -122,8 +122,16 @@ html, body { height: 100%; overflow: hidden; }
 .watching .btn-quiet { min-height: 32px; padding: 6px 10px; font-size: 12px; justify-self: start; }
 
 /* ---- fight extras ---- */
-.opp-pick { position: absolute; top: 152px; left: 50%; transform: translateX(-50%); }
-.fight-speed { position: absolute; right: 32px; bottom: 28px; }
+.fight-bar { position: absolute; left: 32px; top: 50%; transform: translateY(-50%); width: 240px; display: grid; gap: 10px; }
+.opp-select { display: grid; gap: 8px; }
+.opp-select select { font: inherit; font-size: var(--t-sm); background: var(--c-ink); color: var(--c-bone); border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 8px; }
+.opp-blurb { margin: 0; font-size: var(--t-sm); color: var(--c-inkSoft); border-left: 1px solid var(--c-amber); padding-left: 10px; }
+.fight-tools { position: absolute; right: 32px; bottom: 28px; display: flex; gap: 8px; align-items: center; }
+.share-box { position: absolute; right: 32px; bottom: 80px; width: min(440px, calc(100vw - 32px)); }
+.share-box p { margin: 6px 0 12px; color: var(--c-inkSoft); font-size: var(--t-sm); }
+.share-url { width: 100%; font: 12px/1.4 var(--f-mono); color: var(--c-bone); background: var(--c-ink); border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 8px; margin-bottom: 10px; }
+.example { min-height: 1.2em; margin-top: -6px !important; }
+.challenge-name { font-style: italic; }
 
 /* ---- pick: secondary action next to the main one ---- */
 .panel.pick .row-btns { gap: var(--s-md); }
@@ -165,6 +173,11 @@ html, body { height: 100%; overflow: hidden; }
   .lab-side { overflow: visible; }
   .lab-stage { padding: 8px; }
   .tool { padding: 8px 10px; }
-  .opp-pick { top: 100px; }
-  .fight-speed { right: 12px; bottom: auto; top: 100px; display: none; }
+  .fight-bar { left: 12px; right: 12px; top: auto; bottom: 64px; transform: none; width: auto; }
+  .opp-blurb { display: none; }
+  .fight-tools { right: 12px; bottom: 12px; }
+  .share-box { right: 8px; left: 8px; bottom: 60px; width: auto; }
 }
+
+/* While a clip is recording, the HTML UI steps aside (the clip itself is canvas-only). */
+#app.recording .screen, #app.recording .bar { opacity: 0; pointer-events: none; transition: opacity var(--d-base) var(--e-out); }

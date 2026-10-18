@@ -25,8 +25,13 @@ import { LabEditor, labMarkup } from './lab';
 import { commentFor, isReady, LOADING_LINES } from './commentary';
 import { clearSave, loadSave, writeSave } from './save';
 import { COLOR } from './tokens';
+import { ROSTER, rosterFor } from '../data/roster';
+import { decodeCreature, encodeCreature, SharedCreature } from '../share/codec';
+import { canRecord, download, startRecording } from '../share/clip';
+import { shapeFor } from '../evo/ga';
+import type { BrainShape } from '../sim/brain';
 
-type Screen = 'home' | 'pick' | 'lab' | 'evolve' | 'fight';
+type Screen = 'home' | 'challenge' | 'pick' | 'lab' | 'evolve' | 'fight';
 
 interface Starter { spec: CreatureSpec; blurb: string }
 const STARTERS: Starter[] = [
@@ -36,7 +41,11 @@ const STARTERS: Starter[] = [
 ];
 
 /** Who you can fight. Brain opponents come from your own lineage's hall of fame. */
-interface Opponent { id: string; label: string; small: string; spec: CreatureSpec; genome?: number[] }
+interface Opponent {
+  id: string; label: string; small: string; spec: CreatureSpec;
+  genome?: number[]; shape?: BrainShape; blurb?: string;
+  kind: 'buoy' | 'self' | 'roster' | 'challenger';
+}
 
 const $ = <T extends HTMLElement = HTMLElement>(root: ParentNode, sel: string) => root.querySelector<T>(sel)!;
 
@@ -58,6 +67,11 @@ export class App {
   /** Which variant the stage is showing on the Evolve screen (-1 = the champion). */
   private watching = -1;
   private opponentId = 'buoy';
+  /** A creature that arrived through a share link (#c=…). */
+  private challenger: SharedCreature | null = null;
+  private boutSeed = 1000;
+  private recording = false;
+  private clipEndAt: number | null = null;
 
   constructor(private root: HTMLElement, manual = false) {
     root.innerHTML = `
@@ -76,7 +90,15 @@ export class App {
       const li = (e.target as HTMLElement).closest('li');
       if (li?.classList.contains('nav')) this.go(li.dataset.step as Screen);
     });
-    this.go('home');
+    // A share link (#c=…) carries a creature and its brain: open with the challenge.
+    const link = location.hash.match(/^#c=([A-Za-z0-9_-]+)/);
+    let linkError = '';
+    if (link) {
+      try { this.challenger = decodeCreature(link[1]); this.opponentId = 'challenger'; }
+      catch (e) { linkError = (e as Error).message; }
+    }
+    this.go(this.challenger ? 'challenge' : 'home');
+    if (linkError) this.toast(linkError);
   }
 
   /** For automated tests: step the stage manually. */
@@ -109,7 +131,7 @@ export class App {
   private updateSteps(): void {
     const s = this.screen;
     const steps = $(this.root, '#steps');
-    steps.hidden = s === 'home';
+    steps.hidden = s === 'home' || s === 'challenge';
     const order = ['pick', 'evolve', 'fight'];
     const at = s === 'lab' ? 'pick' : s;
     steps.querySelectorAll('li').forEach((li) => {
@@ -127,9 +149,16 @@ export class App {
     const r = this.stage.renderer;
     r.youIndex = null; r.glow = [null, null];
     this.layoutDish('hero');
-    // The background fight: two hand-scripted specimens (the field note admits it).
+    // The background fight: two champions from the shipped roster, really evolved.
+    // (Falls back to the hand-scripted pair if the roster is missing.)
     this.stage.onEnd = null;
-    this.stage.play(() => new Match(CRAB, DUMMY, [new PusherController(), new DummyController()], this.fightSeed++), 2.2);
+    let bout = 0;
+    this.stage.play(() => {
+      if (ROSTER.length < 2) return new Match(CRAB, DUMMY, [new PusherController(), new DummyController()], this.fightSeed++);
+      const a = ROSTER[bout % ROSTER.length], b = ROSTER[(bout * 3 + 1) % ROSTER.length === bout % ROSTER.length ? (bout + 1) % ROSTER.length : (bout * 3 + 1) % ROSTER.length];
+      bout++;
+      return new Match(a.spec, b.spec, [new Brain(a.shape, a.genome), new Brain(b.shape, b.genome)], this.fightSeed++);
+    }, 2.2);
     const save = !this.chosen ? loadSave() : null;
     const resume = this.chosen ? this.chosen.spec : save?.spec;
     el.innerHTML = `
@@ -142,7 +171,7 @@ export class App {
         ${resume ? '<button class="btn-quiet" id="fresh">Start a new lineage</button>' : '<p class="fine">About a minute. Runs entirely in your browser.</p>'}
       </div>
       <aside class="field-note hand pop" style="animation-delay:.4s">
-        Nothing you evolve here is scripted. The two in the background are, and they know it.
+        Nothing in the dish is scripted. The two behind this text evolved for seventy generations before you arrived.
         <span class="sig">field journal, p. 1</span>
       </aside>`;
     $(el, '#start').onclick = () => {
@@ -156,8 +185,11 @@ export class App {
 
   /** Continue from a saved lineage: the population is seeded from the saved champion. */
   private restore(save: NonNullable<ReturnType<typeof loadSave>>): void {
+    const keepOpp = this.opponentId;
     this.resetLineage({ spec: save.spec, blurb: '' });
+    if (keepOpp === 'challenger') this.opponentId = keepOpp;
     this.runner!.evo.seedWith(save.champion);
+    this.adopted = { genome: save.champion, gen: save.generations }; // keep its real age
     this.evolvedOnce = true;
     this.toast(`Resumed ${save.spec.nick} after ${save.generations} generations.`);
     this.go('fight');
@@ -166,12 +198,51 @@ export class App {
   /** Start a new lineage for `starter` (or none). Drops the old population. */
   private resetLineage(starter: Starter | null): void {
     this.runner?.dispose();
-    this.runner = null; this.reports = []; this.adopted = null; this.watching = -1; this.opponentId = 'buoy';
+    this.runner = null; this.reports = []; this.adopted = null; this.watching = -1; this.opponentId = this.challenger ? 'challenger' : 'buoy';
     this.chosen = starter;
     if (starter) {
       this.runner = new EvolutionRunner(starter.spec);
       this.runner.onGeneration = (rep) => this.onGeneration(rep);
     }
+  }
+
+  // ------------------------------------------------------------------ challenge (opened from a share link)
+  private challenge(el: HTMLElement): void {
+    const c = this.challenger!;
+    const name = c.spec.nick ?? c.spec.name.split(' ')[0];
+    const shape = shapeFor(c.spec, c.hidden);
+    this.layoutDish('hero');
+    this.stage.renderer.youIndex = null; this.stage.renderer.glow = [null, null];
+    this.stage.onEnd = null;
+    this.stage.play(() => new Match(c.spec, DUMMY, [new Brain(shape, c.genome), new DummyController()], this.fightSeed++), 2);
+    const save = loadSave();
+    const mine = this.chosen?.spec ?? save?.spec;
+    el.innerHTML = `
+      <div class="hero pop">
+        <span class="eyebrow">A challenge</span>
+        <h1 class="challenge-name">${name}</h1>
+        <p class="lede"><i>${c.spec.name}</i> arrived by link, nervous system intact. It is working on the Buoy behind this text.
+          Decide whether you have something that can beat it.</p>
+        <button class="btn big" id="accept">${mine ? `Fight it with ${mine.nick}` : 'Evolve a challenger'}</button>
+        <button class="btn-quiet" id="later">Not now</button>
+      </div>`;
+    $(el, '#accept').onclick = () => {
+      this.opponentId = 'challenger';
+      if (this.chosen && this.champion) this.go('fight');
+      else if (save) this.restore(save);
+      else this.go('pick');
+    };
+    $(el, '#later').onclick = () => this.go('home');
+  }
+
+  /** Behind the pick panel: what a well-trained specimen of this species does. */
+  private showTrainedExample(spec: CreatureSpec): string {
+    const e = rosterFor(spec);
+    if (!e) return '';
+    this.stage.renderer.youIndex = null;
+    this.stage.onEnd = null;
+    this.stage.play(() => new Match(e.spec, DUMMY, [new Brain(e.shape, e.genome), new DummyController()], this.fightSeed++), 1.5);
+    return `In the dish: a trained ${e.nick} after ${e.generations} generations. Yours starts from nothing.`;
   }
 
   // ------------------------------------------------------------------ pick
@@ -184,6 +255,7 @@ export class App {
         <h2>Choose a specimen</h2>
         <div class="pedestals" id="peds"></div>
         <p class="blurb" id="blurb">All three begin with random nervous systems. None of them can swim yet.</p>
+        <p class="fine example hand" id="example"></p>
         <div class="row-btns">
           <button class="btn big" id="choose" disabled>Select a specimen</button>
           <button class="btn-quiet" id="toLab">Or design your own</button>
@@ -219,6 +291,7 @@ export class App {
     el.querySelectorAll('.pedestal').forEach((b, k) => b.classList.toggle('picked', k === i));
     this.pedestals.forEach((p, k) => { p.selected = k === i; });
     $(el, '#blurb').textContent = st.blurb + (this.chosen && this.chosen !== st && this.reports.length ? ' (Choosing it starts a new lineage.)' : '');
+    $(el, '#example').textContent = this.showTrainedExample(st.spec);
     const btn = $<HTMLButtonElement>(el, '#choose');
     btn.disabled = false;
     btn.textContent = `Continue with ${st.spec.nick}`;
@@ -317,6 +390,7 @@ export class App {
             </div>
             <button class="btn-quiet" id="pause">Pause evolution</button>
             <button class="btn-quiet" id="tinkerToggle">Parameters</button>
+            ${rosterFor(st.spec) ? '<button class="btn-quiet" id="trained">Watch a trained one</button>' : ''}
           </div>
           <div class="tinker" id="tinker" hidden>
             <label>Mutation strength <input type="range" id="mut" min="0.05" max="1" step="0.05" value="${runner.evo.cfg.mutationSize}"><span class="num" id="mutVal"></span></label>
@@ -346,6 +420,13 @@ export class App {
       const i = (e.target as HTMLElement).dataset.rank;
       if (!advanced || i === undefined) return;
       this.watchVariant(+i);
+    };
+    const trained = el.querySelector<HTMLButtonElement>('#trained');
+    if (trained) trained.onclick = () => {
+      const showing = trained.dataset.on === '1';
+      trained.dataset.on = showing ? '0' : '1';
+      trained.textContent = showing ? 'Watch a trained one' : 'Back to yours';
+      if (showing) { this.stage.renderer.youIndex = 0; this.showWatchLoop(); } else this.toast(this.showTrainedExample(st.spec));
     };
     if (this.reports.length) { runner.start(); this.renderLive(); }
     this.wireTinker(el);
@@ -440,13 +521,18 @@ export class App {
   // ------------------------------------------------------------------ fight
   private opponents(): Opponent[] {
     const evo = this.runner!.evo, spec = this.chosen!.spec;
-    const list: Opponent[] = [{ id: 'buoy', label: DUMMY.nick!, small: 'Control specimen', spec: DUMMY }];
+    const list: Opponent[] = [{ id: 'buoy', label: DUMMY.nick!, small: 'Control specimen', spec: DUMMY, kind: 'buoy' }];
+    if (this.challenger) {
+      const c = this.challenger;
+      list.push({ id: 'challenger', label: c.spec.nick ?? c.spec.name.split(' ')[0], small: 'Challenger, from a link', spec: c.spec, genome: c.genome, shape: shapeFor(c.spec, c.hidden), kind: 'challenger' });
+    }
     const n = evo.champions.length;
     if (n >= 3) {
       const g = Math.max(1, n - 5);
-      list.push({ id: 'spar', label: 'Sparring partner', small: `Your generation ${g}`, spec, genome: evo.champions[g - 1] });
+      list.push({ id: 'spar', label: 'Sparring partner', small: `Your generation ${g}`, spec, genome: evo.champions[g - 1], kind: 'self' });
     }
-    if (n >= 8) list.push({ id: 'first', label: 'The ancestor', small: 'Your generation 1', spec, genome: evo.champions[0] });
+    if (n >= 8) list.push({ id: 'first', label: 'The ancestor', small: 'Your generation 1', spec, genome: evo.champions[0], kind: 'self' });
+    for (const e of ROSTER) list.push({ id: `roster-${e.nick}`, label: e.nick, small: `Roster No. ${e.rank} · ${e.generations} generations`, spec: e.spec, genome: e.genome, shape: e.shape, kind: 'roster', blurb: e.blurb });
     return list;
   }
 
@@ -463,37 +549,116 @@ export class App {
     r.youIndex = 0; r.glow = [COLOR.amber, null];
     const opps = this.opponents();
     const opp = opps.find((o) => o.id === this.opponentId) ?? opps[0];
+    const group = (k: Opponent['kind'], label: string) => {
+      const items = opps.filter((o) => o.kind === k);
+      return items.length ? `<optgroup label="${label}">${items.map((o) => `<option value="${o.id}" ${o.id === opp.id ? 'selected' : ''}>${o.label}</option>`).join('')}</optgroup>` : '';
+    };
     el.innerHTML = `
       <div class="versus pop">
-        <span class="label"><small>Yours · ${champ.gen} generations${this.adopted ? ' · adopted' : ''}</small><b>${nick}</b><i>${st.spec.name}</i></span>
+        <span class="label"><small>Yours · ${champ.gen} generation${champ.gen === 1 ? '' : 's'}</small><b>${nick}</b><i>${st.spec.name}</i></span>
         <span class="vs">versus</span>
         <span class="label right"><small>${opp.small}</small><b>${opp.label}</b><i>${opp.spec.name}</i></span>
       </div>
-      ${opps.length > 1 ? `<div class="opp-pick seg" role="group" aria-label="Opponent">${opps.map((o) => `<button class="btn-quiet ${o.id === opp.id ? 'on' : ''}" data-opp="${o.id}">${o.label}</button>`).join('')}</div>` : ''}
-      <div class="fight-speed seg" role="group" aria-label="Speed">${[1, 3].map((v) => `<button class="btn-quiet ${v === 1 ? 'on' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div>
+      <div class="fight-bar pop">
+        <label class="opp-select"><span class="eyebrow">Opponent</span>
+          <select id="opp">${group('buoy', 'Control')}${group('challenger', 'From a link')}${group('self', 'Your lineage')}${group('roster', 'Champion roster')}</select></label>
+        ${opp.blurb ? `<p class="opp-blurb">${opp.blurb}</p>` : ''}
+      </div>
+      <div class="fight-tools pop">
+        <div class="seg" role="group" aria-label="Speed">${[1, 3].map((v) => `<button class="btn-quiet ${v === 1 ? 'on' : ''}" data-speed="${v}">${v}×</button>`).join('')}</div>
+        <button class="btn-quiet" id="share">Share ${nick}</button>
+      </div>
+      <div class="share-box frame" id="shareBox" hidden></div>
       <div class="result frame" id="result" hidden></div>`;
-    el.querySelectorAll<HTMLButtonElement>('[data-opp]').forEach((b) => { b.onclick = () => { this.opponentId = b.dataset.opp!; this.go('fight'); }; });
+    $<HTMLSelectElement>(el, '#opp').onchange = (e) => { this.opponentId = (e.target as HTMLSelectElement).value; this.go('fight'); };
     el.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) => {
       b.onclick = () => { this.stage.speed = +b.dataset.speed!; el.querySelectorAll('[data-speed]').forEach((x) => x.classList.toggle('on', x === b)); };
     });
-    const oppCtrl = () => (opp.genome ? new Brain(evo.shape, opp.genome) : new DummyController());
-    this.stage.play(() => new Match(st.spec, opp.spec, [new Brain(evo.shape, champ.genome), oppCtrl()], 1000 + this.fightSeed++), null);
+    $(el, '#share').onclick = () => this.showShare(el);
+    const oppCtrl = () => (opp.genome ? new Brain(opp.shape ?? evo.shape, opp.genome) : new DummyController());
+    // One fixed seed per bout, so "Record a clip" can replay exactly what you just saw.
+    const seed = 1000 + this.fightSeed++;
+    this.boutSeed = seed;
+    const makeMatch = () => new Match(st.spec, opp.spec, [new Brain(evo.shape, champ.genome), oppCtrl()], this.boutSeed);
+    this.stage.play(makeMatch, null);
     this.stage.onEnd = (m) => {
+      if (this.recording) return; // the clip handler deals with the end of a recorded replay
       const res = m.result!;
       const box = $(el, '#result');
       const won = res.winner === 0;
-      const isBuoy = opp.id === 'buoy';
-      const how = res.reason === 'ringout' ? `${isBuoy ? 'The Buoy' : 'The opponent'} left the ring after ${res.time.toFixed(1)} s.` : 'It was nearer the centre when time ran out.';
+      const name = opp.kind === 'buoy' ? 'The Buoy' : opp.label;
+      const how = res.reason === 'ringout' ? `${name} left the ring after ${res.time.toFixed(1)} s.` : 'It was nearer the centre when time ran out.';
+      const lose: Record<Opponent['kind'], string> = {
+        buoy: 'It does nothing at all, which was enough this time. A few more generations should change that.',
+        self: 'An earlier version of itself. Selection is not a straight line.',
+        roster: `${opp.label} trained for ${opp.small.split('· ')[1] ?? 'a long time'}. It shows.`,
+        challenger: 'Someone else\'s lineage, someone else\'s ideas. Back to the dish.',
+      };
       box.innerHTML = won
-        ? `<span class="eyebrow">Result</span><h2>${nick} holds the dish</h2><p>${how} ${isBuoy ? `${champ.gen} generations ago it could not swim in a straight line.` : 'Evolution remembers what it learned.'}</p>`
-        : `<span class="eyebrow">Result</span><h2>${isBuoy ? 'The Buoy holds' : `${opp.label} wins`}</h2><p>${isBuoy ? 'It does nothing at all, which was enough this time. A few more generations should change that.' : 'An earlier version of itself. Selection is not a straight line.'}</p>`;
+        ? `<span class="eyebrow">Result</span><h2>${nick} holds the dish</h2><p>${how} ${opp.kind === 'buoy' ? `${champ.gen} generations ago it could not swim in a straight line.` : 'Evolution remembers what it learned.'}</p>`
+        : `<span class="eyebrow">Result</span><h2>${opp.kind === 'buoy' ? 'The Buoy holds' : `${opp.label} wins`}</h2><p>${lose[opp.kind]}</p>`;
       box.insertAdjacentHTML('beforeend', `<div class="row-btns">
           <button class="btn" id="again">${won ? 'Rematch' : 'Keep evolving'}</button>
-          <button class="btn-quiet" id="other">${won ? 'Keep evolving' : 'Rematch'}</button></div>`);
+          <button class="btn-quiet" id="other">${won ? 'Keep evolving' : 'Rematch'}</button>
+          ${canRecord() ? '<button class="btn-quiet" id="clip">Record a clip</button>' : ''}</div>`);
       box.hidden = false; box.classList.add('pop');
-      const again = () => { box.hidden = true; this.stage.restart(); };
+      const again = () => { box.hidden = true; this.boutSeed = 1000 + this.fightSeed++; this.stage.restart(); };
       $(box, '#again').onclick = won ? again : () => this.go('evolve');
       $(box, '#other').onclick = won ? () => this.go('evolve') : again;
+      const clip = box.querySelector<HTMLButtonElement>('#clip');
+      if (clip) clip.onclick = () => this.recordClip(box, `${nick} vs ${opp.label}`, `${st.spec.name} · ${champ.gen} generations`);
+    };
+  }
+
+  /** Replay the bout that just ended (same seed) while recording the canvas. */
+  private async recordClip(box: HTMLElement, title: string, sub: string): Promise<void> {
+    box.hidden = true;
+    const r = this.stage.renderer;
+    r.caption = { title, sub };
+    this.recording = true;
+    this.root.classList.add('recording');
+    this.stage.speed = 1;
+    this.stage.restart(); // same boutSeed → the identical fight
+    this.toast('Recording the replay…');
+    const rec = startRecording(this.stage.canvas);
+    const t0 = performance.now();
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        const m = this.stage.match;
+        const elapsed = (performance.now() - t0) / 1000;
+        // Stop 1.5 s after the knock-out, or at 20 s.
+        if ((m?.result && elapsed > 0 && (this.clipEndAt ??= elapsed + 1.5) <= elapsed) || elapsed > 20) resolve();
+        else requestAnimationFrame(check);
+      };
+      this.clipEndAt = null;
+      requestAnimationFrame(check);
+    });
+    const { blob, ext } = await rec.stop();
+    r.caption = null;
+    this.recording = false;
+    this.root.classList.remove('recording');
+    download(blob, `petri-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.${ext}`);
+    this.toast(`Clip saved (${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB).`);
+    box.hidden = false;
+  }
+
+  /** The share panel: a link that carries this creature and its brain. */
+  private showShare(el: HTMLElement): void {
+    const box = $(el, '#shareBox');
+    if (!box.hidden) { box.hidden = true; return; }
+    const champ = this.champion!;
+    const code = encodeCreature({ spec: this.chosen!.spec, genome: champ.genome, hidden: this.runner!.evo.shape.hidden });
+    const url = `${location.origin}${location.pathname}#c=${code}`;
+    box.innerHTML = `<span class="eyebrow">Share</span>
+      <p>Anyone who opens this link can fight your ${this.chosen!.spec.nick}. The body and brain travel inside the link itself; nothing is uploaded.</p>
+      <input class="share-url" id="shareUrl" readonly value="${url}" aria-label="Share link">
+      <div class="row-btns"><button class="btn" id="copy">Copy link</button><span class="fine">${url.length} characters</span></div>`;
+    box.hidden = false; box.classList.add('pop');
+    const input = $<HTMLInputElement>(box, '#shareUrl');
+    input.onfocus = () => input.select();
+    $(box, '#copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(url); this.toast('Link copied.'); }
+      catch { input.focus(); input.select(); this.toast('Select the link and copy it.'); }
     };
   }
 
