@@ -19,48 +19,79 @@ export type Opponent =
   | { kind: 'dummy'; spec: CreatureSpec }
   | { kind: 'brain'; spec: CreatureSpec; shape: BrainShape; genome: number[] };
 
+/** A brain's exam: a list of (opponent, seed) fights. */
 export interface EvalJob {
   spec: CreatureSpec;
   shape: BrainShape;
-  opponents: Opponent[];
-  seeds: number[];
+  games: { opp: Opponent; seed: number }[];
 }
 
-/** `pushes` = wins by a real push-out before sudden death. */
-export interface EvalResult { fitness: number; wins: number; games: number; pushes: number }
+/** Helper: every opponent × every seed. */
+export function allPairs(spec: CreatureSpec, shape: BrainShape, opponents: Opponent[], seeds: number[]): EvalJob {
+  return { spec, shape, games: opponents.flatMap((opp) => seeds.map((seed) => ({ opp, seed }))) };
+}
+
+/**
+ * `pushes` = wins by a real push-out. `flags` counts anti-cheat penalties,
+ * which the Lab Notebook uses to talk about reward hacking.
+ */
+export interface EvalResult { fitness: number; wins: number; games: number; pushes: number; flags: CheatFlags }
+export interface CheatFlags { exploit: number; idle: number; camping: number }
 
 export function makeController(o: Opponent): Controller {
   return o.kind === 'dummy' ? new DummyController() : new Brain(o.shape, o.genome);
 }
 
-/** Score one brain. Each (opponent, seed) pair is one match. */
+/** Score one brain over all the fights in its exam. */
 export function evaluate(job: EvalJob, genome: ArrayLike<number>): EvalResult {
   let total = 0, wins = 0, games = 0, pushes = 0;
-  for (const opp of job.opponents) {
-    for (const seed of job.seeds) {
-      const s = scoreMatch(job, genome, opp, seed);
-      total += s.score; if (s.won) wins++; if (s.pushed) pushes++; games++;
-    }
+  const flags: CheatFlags = { exploit: 0, idle: 0, camping: 0 };
+  for (const { opp, seed } of job.games) {
+    const s = scoreMatch(job, genome, opp, seed);
+    total += s.score; if (s.won) wins++; if (s.pushed) pushes++; games++;
+    if (s.flag) flags[s.flag]++;
   }
-  return { fitness: total / games, wins, games, pushes };
+  return { fitness: total / games, wins, games, pushes, flags };
 }
 
-/** Points for one match (0 … ~1.4). */
-export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponent, seed: number): { score: number; won: boolean; pushed: boolean } {
+// ---- anti-cheat thresholds ----
+const EXPLOIT_HITS = 3;        // speed-cap hits in one match → it found a physics glitch
+const IDLE_PATH = 0.6;         // travelled less than 0.6 × ring radius in a whole match → couch potato
+const CAMP_FRACTION = 0.7;     // spent >70% of the match in the middle third…
+const CAMP_RADIUS = 0.33;      // …(this fraction of the ring radius) without ever touching anyone
+
+/**
+ * Points for one match (0 … ~1.4), with anti-cheat rules applied.
+ *
+ * Evolution optimises exactly what we score, loopholes included ("reward
+ * hacking"). The three rules below close loopholes we've seen or expect:
+ *   exploit: absurd speeds mean a physics glitch → the match scores 0.
+ *   idle:    doing nothing and hoping the opponent falls out → −0.2.
+ *   camping: parking in the middle and waiting for the rim to shrink,
+ *            without ever engaging → −0.2.
+ */
+export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponent, seed: number): MatchScore {
   const me = new Brain(job.shape, genome);
   const m = new Match(job.spec, opp.spec, [me, makeController(opp)], seed);
   const start = m.com(1);
   const oppStartR = Math.hypot(start.x, start.y);
-  let closeness = 0;
+  let closeness = 0, samples = 0, path = 0, inMiddle = 0;
+  let last = m.com(0);
   while (!m.result) {
     m.step();
-    // Shaping: being near the opponent (you can't push from across the dish).
     if (m.tick % 4 === 0) {
       const a = m.com(0), b = m.com(1);
+      samples++;
+      // Shaping: being near the opponent (you can't push from across the dish).
       closeness += Math.max(0, 1 - Math.hypot(a.x - b.x, a.y - b.y) / RING_RADIUS);
+      path += Math.hypot(a.x - last.x, a.y - last.y);
+      if (Math.hypot(a.x, a.y) < CAMP_RADIUS * RING_RADIUS) inMiddle++;
+      last = a;
     }
   }
   const r = m.result;
+  if (m.world.speedCapHits[0] >= EXPLOIT_HITS) return { score: 0, won: false, pushed: false, flag: 'exploit' };
+
   const end = m.com(1);
   const pushed = (Math.hypot(end.x, end.y) - oppStartR) / RING_RADIUS; // how far I moved them outward
   let score = 0;
@@ -70,9 +101,15 @@ export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponen
     score += isPush(m) ? 1 : 0.45;
   } else if (r.winner === -1) score += 0.2;
   score += 0.25 * clamp(pushed, -0.5, 1);
-  score += 0.15 * (closeness / Math.max(1, m.tick / 4));
-  return { score, won: r.winner === 0, pushed: r.winner === 0 && isPush(m) };
+  score += 0.15 * (closeness / Math.max(1, samples));
+
+  let flag: MatchScore['flag'] = null;
+  if (path < IDLE_PATH * RING_RADIUS) { score -= 0.2; flag = 'idle'; }
+  else if (m.lastContactTick < 0 && inMiddle > CAMP_FRACTION * samples) { score -= 0.2; flag = 'camping'; }
+  return { score, won: r.winner === 0, pushed: r.winner === 0 && isPush(m), flag };
 }
+
+export interface MatchScore { score: number; won: boolean; pushed: boolean; flag: keyof CheatFlags | null }
 
 /** A win counts as a real push-out if the loser left the ring within 1.5 s of being touched. */
 export function isPush(m: Match): boolean {
@@ -80,3 +117,19 @@ export function isPush(m: Match): boolean {
 }
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);
+
+/**
+ * Head-to-head: how often does brain A beat brain B? Each seed is played
+ * twice with sides swapped, so neither gets the "left side" every time.
+ * Draws count as half a win.
+ */
+export function headToHead(spec: CreatureSpec, shape: BrainShape, a: ArrayLike<number>, b: ArrayLike<number>, seeds: number[]): number {
+  let score = 0;
+  for (const seed of seeds) {
+    const r1 = new Match(spec, spec, [new Brain(shape, a), new Brain(shape, b)], seed).run();
+    const r2 = new Match(spec, spec, [new Brain(shape, b), new Brain(shape, a)], seed).run();
+    score += r1.winner === 0 ? 1 : r1.winner === -1 ? 0.5 : 0;
+    score += r2.winner === 1 ? 1 : r2.winner === -1 ? 0.5 : 0;
+  }
+  return score / (seeds.length * 2);
+}

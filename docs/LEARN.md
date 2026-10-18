@@ -157,6 +157,54 @@ is worth far less than a real push.
 
 ---
 
+## 4. Stage 2: making evolution honest (and proving it works)
+
+### Who do they fight? (`src/evo/schedule.ts`)
+Each brain's "exam" is 4 short fights: Globby twice, the latest champion once, and one
+random **older** champion once. The older champions are the *hall of fame*.
+- Only fighting Globby teaches one trick ("push the sleepy blob").
+- Only fighting the latest champion can go in circles: A beats B, B beats C, C beats A,
+  and evolution chases its tail forever (*cycling*, like rock-paper-scissors).
+- Mixing in old champions means a new trick only counts if it doesn't forget how to beat
+  old ones. This is called **self-play against a hall of fame**, and it's the same idea
+  used to train game-playing AIs.
+- Seeds change every generation, so no brain can memorise one particular fight.
+
+### Anti-cheat: closing loopholes (`src/evo/fitness.ts`)
+Evolution optimises *exactly* what you score, loopholes included. That's **reward hacking**.
+Three rules:
+| Flag | What it catches | Penalty |
+|---|---|---|
+| `exploit` | ≥3 hits of the physics speed cap: it found a glitch | that fight scores 0 |
+| `idle` | barely moved all match, hoping the rim gets the other guy | −0.2 |
+| `camping` | sat in the middle third >70% of the match and never touched anyone | −0.2 |
+Plus the earlier rule: outlasting the shrinking rim is worth 0.45, a real push-out 1.0.
+The flags are counted per generation (`GenReport.flags`); the commentary mentions
+reward hacking the first time lots of brains get flagged.
+
+### The proof (`scripts/proof.ts`, `tests/evolution.test.ts`)
+We evolve Wriggle for 30 generations, then test every generation's champion on
+**20 fresh seeds never used in training**, each seed played from both sides:
+- vs the generation-0 champion: 50% (by definition) → 100% from generation 1 on.
+  (The generation-0 champion is just the luckiest random brain, so this saturates fast.)
+- push-outs vs Globby: 0% for gens 0–5 → 35% by generation 9, which holds steady to 30.
+
+![proof chart](img/stage2-proof.svg)
+
+The unit test runs a shorter version (8 generations, default settings) and requires
+generation 7 to beat generation 0 in more than 60% of fights. It gets 100%.
+**Honest notes:** with a population of 24 instead of 48, 10 generations was *not* enough
+in our run (40%). Small populations are noisy. And progress against Globby shows up
+later (gen 9+) than progress against rivals, because self-play mostly rewards beating rivals.
+
+### Speed trick: a broadphase
+Most of the time the two creatures are far apart, yet we were checking every joint
+against every bone for collisions. Now each substep first compares the two creatures'
+padded bounding boxes; if they don't overlap, collisions are skipped entirely. Same
+results bit for bit (the fingerprint test proves it), about 2.5× faster training.
+
+---
+
 ## Glossary
 
 ### Git terms
@@ -193,6 +241,8 @@ is worth far less than a real push.
 - **Headless** — running without a visible window or screen.
 - **requestAnimationFrame** — asks the browser to call your function before the next screen repaint; the heartbeat of a web game loop.
 - **devicePixelRatio** — how many physical pixels per CSS pixel (2 on most phones); we scale the canvas so it stays sharp.
+- **Hall of fame / self-play** — training against copies of your own past champions.
+- **Broadphase** — a cheap first check (e.g. bounding boxes) that rules out most collision pairs before the expensive exact check.
 - **CSS custom property** — a variable in CSS (`--c-mint: #8fe3c0;` then `var(--c-mint)`).
 - **Composite operation** — how new canvas drawing combines with what's already there (`source-atop`, `destination-over`…).
 - **Multi-page Vite build** — several HTML entry points (`index.html`, `mockup.html`, `creatures.html`) built together.

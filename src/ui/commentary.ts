@@ -30,6 +30,13 @@ export function commentFor(r: GenReport, history: GenReport[], nick: string): Li
       tip: { word: 'selection', meaning: 'better fighters are more likely to become parents. That\'s the whole trick.' },
     };
   }
+  const lazy = r.flags.idle + r.flags.camping;
+  if (lazy > r.popSize * 1.5 && !history.slice(0, -1).some((h) => h.flags.idle + h.flags.camping > h.popSize * 1.5)) {
+    return {
+      text: `Generation ${g}: lots of brains are trying to "win" by doing nothing and hoping the rim gets the other guy. I dock points for that.`,
+      tip: { word: 'reward hacking', meaning: 'when learners find a loophole in the score instead of doing what you meant. Very common. Very sneaky.' },
+    };
+  }
   if (prev && r.best > prev.best + 0.08) {
     return {
       text: `Generation ${g}: big jump! A lucky mutation made someone noticeably better.`,

@@ -1,5 +1,13 @@
 # Changelog
 
+## Stage 2: evolution engine, anti-cheat, proof
+- Self-play vs a hall of fame (`src/evo/schedule.ts`): each brain fights Globby ×2, the latest champion, and one random older champion; fresh seeds every generation.
+- Anti-cheat in fitness: `exploit` (speed-cap abuse → 0), `idle` (−0.2), `camping` (−0.2), plus push-out vs rim-survival scoring. Flags reported per generation; commentary introduces "reward hacking".
+- Proof: `scripts/proof.ts` → `docs/img/stage2-proof.svg` + `docs/data/stage2-proof.json`. Wriggle, 30 gens, 20 fresh seeds: champions beat gen 0 in 100% of fights from gen 1; push-outs vs Globby 0% → 35% (gen 9+).
+- `tests/evolution.test.ts`: brain, GA reproducibility, elitism, schedule, idle flag, and the proof test (gen 7 beats gen 0: 100%).
+- Collision broadphase: ~2.5× faster training, bit-identical results.
+- `headToHead()` for fair A-vs-B win rates (both sides).
+
 ## Design pass: warm, handmade, obvious from the first minute
 - New design language (`docs/DESIGN.md`). **All colours, fonts, spacing, radii, shadows and easing live in one file: `src/ui/tokens.ts`**, shared by CSS (custom properties) and canvas.
 - Dusky plum palette with peach/coral/butter/mint/lavender/sky; Fraunces + Nunito + Caveat (+ mono for tiny numbers); hand-cut frames, stickers, paper grain, squishy buttons.

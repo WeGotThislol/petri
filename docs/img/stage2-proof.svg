@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" role="img" aria-labelledby="t d">
+<title id="t">Evolution works: Wriggle's champions get better every generation</title>
+<desc id="d">Line chart. Win rate of each generation's champion against the generation-0 champion rises from 50% to 100%. Push-out rate against the dummy rises to 35%. Measured on 20 fresh seeds never used in training.</desc>
+<rect width="760" height="380" rx="22" fill="#29233f"/>
+<text x="64" y="30" fill="#fbefdc" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="18" font-weight="700">Does evolution work? Wriggle, 30 generations</text>
+<text x="64" y="50" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="13">measured on 20 fresh seeds never used in training · each seed played from both sides</text>
+<line x1="64" x2="590" y1="328" y2="328" stroke="#5c5180" stroke-opacity="0.35" stroke-width="1" />
+<text x="54" y="332" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">0%</text>
+<line x1="64" x2="590" y1="262" y2="262" stroke="#5c5180" stroke-opacity="0.35" stroke-width="1" />
+<text x="54" y="266" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">25%</text>
+<line x1="64" x2="590" y1="196" y2="196" stroke="#5c5180" stroke-opacity="0.9" stroke-width="1" stroke-dasharray="5 5"/>
+<text x="54" y="200" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">50%</text>
+<line x1="64" x2="590" y1="130" y2="130" stroke="#5c5180" stroke-opacity="0.35" stroke-width="1" />
+<text x="54" y="134" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">75%</text>
+<line x1="64" x2="590" y1="64" y2="64" stroke="#5c5180" stroke-opacity="0.35" stroke-width="1" />
+<text x="54" y="68" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">100%</text>
+<text x="586" y="190" text-anchor="end" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="11">50% = no better than generation 0</text>
+<text x="64" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">0</text>
+<text x="154.68965517241378" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">5</text>
+<text x="245.3793103448276" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">10</text>
+<text x="336.0689655172414" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">15</text>
+<text x="426.7586206896552" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">20</text>
+<text x="517.448275862069" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">25</text>
+<text x="590" y="348" text-anchor="middle" fill="#b0a4c8" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">29</text>
+<text x="327" y="368" text-anchor="middle" fill="#d9cce0" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="13">generation</text>
+<path d="M64.0,328.0 L82.1,328.0 L100.3,328.0 L118.4,328.0 L136.6,328.0 L154.7,328.0 L172.8,301.6 L191.0,328.0 L209.1,314.8 L227.2,235.6 L245.4,235.6 L263.5,235.6 L281.7,248.8 L299.8,235.6 L317.9,262.0 L336.1,262.0 L354.2,248.8 L372.3,248.8 L390.5,262.0 L408.6,248.8 L426.8,262.0 L444.9,235.6 L463.0,235.6 L481.2,235.6 L499.3,235.6 L517.4,235.6 L535.6,235.6 L553.7,235.6 L571.9,222.4 L590.0,235.6" fill="none" stroke="#bfaeff" stroke-width="2" stroke-linejoin="round"/>
+<path d="M64.0,196.0 L82.1,64.0 L100.3,64.0 L118.4,70.6 L136.6,70.6 L154.7,64.0 L172.8,77.2 L191.0,70.6 L209.1,64.0 L227.2,64.0 L245.4,64.0 L263.5,64.0 L281.7,64.0 L299.8,64.0 L317.9,64.0 L336.1,64.0 L354.2,64.0 L372.3,64.0 L390.5,64.0 L408.6,64.0 L426.8,64.0 L444.9,64.0 L463.0,64.0 L481.2,64.0 L499.3,64.0 L517.4,64.0 L535.6,64.0 L553.7,64.0 L571.9,64.0 L590.0,64.0" fill="none" stroke="#8fe3c0" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="64" cy="196" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 0: beats gen 0 50% · pushes Globby out 0%</title></circle>
+<circle cx="82.13793103448276" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 1: beats gen 0 100% · pushes Globby out 0%</title></circle>
+<circle cx="100.27586206896552" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 2: beats gen 0 100% · pushes Globby out 0%</title></circle>
+<circle cx="118.41379310344828" cy="70.60000000000001" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 3: beats gen 0 98% · pushes Globby out 0%</title></circle>
+<circle cx="136.55172413793105" cy="70.60000000000001" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 4: beats gen 0 98% · pushes Globby out 0%</title></circle>
+<circle cx="154.68965517241378" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 5: beats gen 0 100% · pushes Globby out 0%</title></circle>
+<circle cx="172.82758620689657" cy="77.20000000000002" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 6: beats gen 0 95% · pushes Globby out 10%</title></circle>
+<circle cx="190.9655172413793" cy="70.60000000000001" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 7: beats gen 0 98% · pushes Globby out 0%</title></circle>
+<circle cx="209.10344827586206" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 8: beats gen 0 100% · pushes Globby out 5%</title></circle>
+<circle cx="227.24137931034483" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 9: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="245.3793103448276" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 10: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="263.51724137931035" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 11: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="281.65517241379314" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 12: beats gen 0 100% · pushes Globby out 30%</title></circle>
+<circle cx="299.7931034482759" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 13: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="317.9310344827586" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 14: beats gen 0 100% · pushes Globby out 25%</title></circle>
+<circle cx="336.0689655172414" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 15: beats gen 0 100% · pushes Globby out 25%</title></circle>
+<circle cx="354.2068965517241" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 16: beats gen 0 100% · pushes Globby out 30%</title></circle>
+<circle cx="372.34482758620686" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 17: beats gen 0 100% · pushes Globby out 30%</title></circle>
+<circle cx="390.48275862068965" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 18: beats gen 0 100% · pushes Globby out 25%</title></circle>
+<circle cx="408.6206896551724" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 19: beats gen 0 100% · pushes Globby out 30%</title></circle>
+<circle cx="426.7586206896552" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 20: beats gen 0 100% · pushes Globby out 25%</title></circle>
+<circle cx="444.8965517241379" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 21: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="463.0344827586207" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 22: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="481.1724137931035" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 23: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="499.3103448275862" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 24: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="517.448275862069" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 25: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="535.5862068965517" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 26: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="553.7241379310344" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 27: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<circle cx="571.8620689655172" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 28: beats gen 0 100% · pushes Globby out 40%</title></circle>
+<circle cx="590" cy="64" r="4" fill="#8fe3c0" stroke="#29233f" stroke-width="2"><title>gen 29: beats gen 0 100% · pushes Globby out 35%</title></circle>
+<text x="600" y="68" fill="#fbefdc" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="700">beats gen-0 champ</text>
+<text x="600" y="84" fill="#d9cce0" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">100% of fights</text>
+<text x="600" y="239.6" fill="#fbefdc" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="700">pushes Globby out</text>
+<text x="600" y="255.6" fill="#d9cce0" font-family="'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="12">35% of fights</text>
+</svg>

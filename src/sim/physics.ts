@@ -113,10 +113,12 @@ export class World {
       p.y += p.vy * h;
     }
 
-    // Step 3: satisfy constraints.
+    // Step 3: satisfy constraints. Collisions are skipped entirely while the
+    // creatures' bounding boxes are far apart (a cheap "broadphase").
+    const near = this.bodiesNear();
     for (let it = 0; it < PHYS.iterations; it++) {
       this.solveBones();
-      this.solveCollisions(recordContacts && it === 0);
+      if (near) this.solveCollisions(recordContacts && it === 0);
     }
 
     // Step 4: velocity = displacement / time, with a hard speed cap.
@@ -130,6 +132,26 @@ export class World {
         this.speedCapHits[p.body]++;
       }
     }
+  }
+
+  /** Could any two bodies be touching? Compares padded bounding boxes. */
+  private bodiesNear(): boolean {
+    const n = this.touch.length;
+    if (n < 2) return false;
+    const box = new Float64Array(n * 4).fill(0);
+    for (let b = 0; b < n; b++) { box[b * 4] = Infinity; box[b * 4 + 1] = Infinity; box[b * 4 + 2] = -Infinity; box[b * 4 + 3] = -Infinity; }
+    for (const p of this.particles) {
+      const k = p.body * 4, pad = p.r + 6; // generous margin: positions still shift a little while solving
+      if (p.x - pad < box[k]) box[k] = p.x - pad;
+      if (p.y - pad < box[k + 1]) box[k + 1] = p.y - pad;
+      if (p.x + pad > box[k + 2]) box[k + 2] = p.x + pad;
+      if (p.y + pad > box[k + 3]) box[k + 3] = p.y + pad;
+    }
+    for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
+      const A = a * 4, B = b * 4;
+      if (box[A] <= box[B + 2] && box[B] <= box[A + 2] && box[A + 1] <= box[B + 3] && box[B + 1] <= box[A + 3]) return true;
+    }
+    return false;
   }
 
   private applyMuscles(): void {

@@ -4,14 +4,16 @@
  * worker pool.
  */
 import type { CreatureSpec } from '../sim/creature';
-import { DUMMY } from '../sim/creature';
 import { DEFAULT_CONFIG, EvoConfig, Evolution, GenStats } from './ga';
-import type { EvalJob } from './fitness';
+import type { CheatFlags } from './fitness';
+import { trainingJob } from './schedule';
 import { EvalPool } from './pool';
 
 export interface GenReport extends GenStats {
-  /** How many individuals pushed the dummy out at least once. */
+  /** How many individuals pushed an opponent out at least once. */
   pushers: number;
+  /** Anti-cheat flags raised across the whole population this generation. */
+  flags: CheatFlags;
   popSize: number;
   seconds: number;
 }
@@ -44,18 +46,15 @@ export class EvolutionRunner {
 
   private async loop(): Promise<void> {
     while (this.running) {
-      const g = this.evo.generation;
       const t0 = performance.now();
-      const job: EvalJob = {
-        spec: this.spec, shape: this.evo.shape,
-        opponents: [{ kind: 'dummy', spec: DUMMY }],
-        seeds: [g * 2 + 1, g * 2 + 2], // fresh seeds every generation: no memorising one fight
-      };
+      const job = trainingJob(this.evo);
       const results = await this.pool.evaluate(job, this.evo.pop);
       if (!this.running) break;
       const pushers = results.filter((r) => r.pushes > 0).length;
+      const flags: CheatFlags = { exploit: 0, idle: 0, camping: 0 };
+      for (const r of results) { flags.exploit += r.flags.exploit; flags.idle += r.flags.idle; flags.camping += r.flags.camping; }
       const stats = this.evo.advance(results);
-      this.onGeneration({ ...stats, pushers, popSize: results.length, seconds: (performance.now() - t0) / 1000 });
+      this.onGeneration({ ...stats, pushers, flags, popSize: results.length, seconds: (performance.now() - t0) / 1000 });
     }
   }
 }
