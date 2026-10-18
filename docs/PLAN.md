@@ -71,7 +71,7 @@ A replay = `{creatureA, creatureB, seed}`. Re-running the sim reproduces it.
 - **Senses** (brain inputs): distance to rim, opponent direction (rotated into
   body frame, as a 2-vector — no trig), opponent distance, touch, own
   muscle lengths, a clock oscillator.
-- Fixed timestep 1/60 s, 4 substeps. Matches capped at 30 s; the ring starts
+- Fixed tick of 1/40 simulated s (shown at 60 ticks/s, so game time runs 1.5× real), 4 substeps. Matches capped at 30 s; the ring starts
   shrinking at 15 s (sudden death) so every match ends.
 
 ## Evolution

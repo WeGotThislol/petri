@@ -54,7 +54,68 @@ one number. Two tricks make this possible:
 
 ---
 
-## 2. Glossary
+## 2. Stage 1: physics, a creature, and a sumo match
+
+### Files to read, in this order
+1. `src/sim/physics.ts`: the physics engine (about 250 lines).
+2. `src/sim/creature.ts`: what a creature *is* (joints, bones, muscles) and the hand-built crab.
+3. `src/sim/match.ts`: the rules of sumo, plus the **sensors** each creature's controller reads.
+4. `src/sim/controllers.ts`: two hand-written "brains" (the pusher and the dummy).
+5. `src/render/renderer.ts` and `src/main.ts`: drawing it and the game loop.
+
+### How a creature moves
+A creature is a little machine of **joints** (point masses), **bones** (rigid
+sticks) and **muscles** (springs whose target length the brain sets every tick:
+`-1` = fully contracted, `+1` = fully extended).
+
+There's no gravity (we look *down* into the dish), so how does anything move?
+**Fluid drag.** Each bone feels drag that is ~40× stronger sideways than
+lengthwise, like an oar in water. Flick a tail left and right and the sideways
+slaps push water backwards, so the body goes forwards. That's how a tadpole
+swims. `tests/match.test.ts` checks it really happens.
+
+### Position Based Dynamics (PBD) in four lines
+Every small step (1/160 of a simulated second):
+1. `velocity += force / mass * dt` (muscles and drag)
+2. `position += velocity * dt`
+3. Nudge positions until the bones have their right length again and nobody overlaps.
+4. `velocity = (new position − old position) / dt`
+
+Step 3 is the trick: instead of computing huge forces for rigid bones (which
+explodes numerically), we *move* the points directly. It's simple and very stable.
+
+### Sensors: what a creature "knows"
+Every tick each creature gets 12 numbers plus one per muscle (`S` in `match.ts`):
+where the opponent is (in *its own* body frame, so "ahead" or "to my right"), how
+far the rim is, its own speed, whether it's touching someone, a built-in
+rhythm (a triangle wave), and how stretched each of its muscles is. In Stage 2 a
+neural network turns these numbers into muscle commands. For now
+`PusherController` does it with hand-written rules.
+
+### The game loop: fixed timestep + interpolation
+Screens refresh at 60, 120 or 144 Hz, but the simulation must always advance
+in identical ticks to stay deterministic. So `main.ts` keeps an *accumulator*:
+real time flows in, whole ticks come out, and the renderer draws a blend
+between the last two ticks so motion looks smooth at any refresh rate.
+
+### How we know it works
+- `npm test` runs the unit tests: determinism (same seed gives an identical
+  match), a recorded fingerprint, physics stability under random muscle spasms,
+  swimming, sumo rules, and "the pusher beats the dummy ≥18/20".
+- `npm run e2e` (with `npm run dev` running) opens the game in headless Chrome,
+  checks it draws, and checks the **browser's** simulation produces the same
+  fingerprint as Node's. That's our proof of cross-engine determinism.
+
+### C++ corner
+- `Float64Array` is like `std::vector<double>` with a fixed size: fast, no boxing.
+- `readonly` ≈ `const` member. `private x` in a constructor's parameter list
+  declares *and* assigns a member in one go.
+- `interface` describes the shape of an object (like a struct with no code). Any
+  object with those fields fits; there's no inheritance needed.
+
+---
+
+## Glossary
 
 ### Git terms
 - **Repository (repo)** — a project folder whose full history is tracked by git.
@@ -88,3 +149,6 @@ one number. Two tricks make this possible:
   push (ours: install → test → build → publish to Pages). Lives in
   `.github/workflows/deploy.yml`.
 - **Headless** — running without a visible window or screen.
+- **requestAnimationFrame** — asks the browser to call your function before the next screen repaint; the heartbeat of a web game loop.
+- **devicePixelRatio** — how many physical pixels per CSS pixel (2 on most phones); we scale the canvas so it stays sharp.
+- **tsx** — runs a TypeScript file directly in Node (`npx tsx scripts/probe.ts`), no build step.
