@@ -51,6 +51,8 @@ export class Evolution {
   history: GenStats[] = [];
   /** Best genome of each finished generation (champions). */
   champions: number[][] = [];
+  /** The population that was just evaluated (`results[i]` belongs to `lastPop[i]`). */
+  lastPop: number[][] = [];
   private rng: Rng;
 
   constructor(readonly spec: CreatureSpec, public cfg: EvoConfig = { ...DEFAULT_CONFIG }, seed = 1) {
@@ -70,6 +72,16 @@ export class Evolution {
 
   get best(): number[] { return this.pop[this.bestIndex]; }
 
+  /**
+   * Start a lineage from a saved champion: the population becomes the champion
+   * plus mutated copies of it, and the champion joins the hall of fame.
+   */
+  seedWith(genome: number[]): void {
+    if (genome.length !== this.pop[0].length) return;
+    this.champions = [genome.slice()];
+    this.pop = this.pop.map((_, i) => (i === 0 ? genome.slice() : genome.map((w) => w + (this.rng.next() < 0.3 ? this.rng.gauss() * this.cfg.mutationSize : 0))));
+  }
+
   /** Record fitness for the current population (from any evaluator), then breed the next one. */
   advance(results: EvalResult[]): GenStats {
     this.results = results;
@@ -84,6 +96,7 @@ export class Evolution {
     };
     this.history.push(stats);
     this.champions.push(this.pop[bi].slice());
+    this.lastPop = this.pop;
     this.pop = this.breed();
     this.generation++;
     return stats;

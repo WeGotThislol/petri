@@ -34,7 +34,11 @@ export interface CreatureSpec {
   muscles: MuscleSpec[];
   /** Index of the joint that counts as the "head" (defines which way is forward). */
   head: number;
+  /** Which sense organs it has (all on if omitted). Missing senses read as zero. */
+  senses?: Senses;
 }
+
+export interface Senses { opponent: boolean; edge: boolean; touch: boolean }
 
 /** A creature placed in a world: which particle/muscle indices belong to it. */
 export interface CreatureInstance {
@@ -255,3 +259,42 @@ export const EEL: CreatureSpec = {
 
 /** Every body, for the creature sheet and (later) the Lab's template picker. */
 export const ALL_BODIES: CreatureSpec[] = [CRAB, TADPOLE, PADDLER, SPINNER, DUMMY, SNIPPER, JELLY, EEL];
+
+// ---------------------------------------------------------------------------
+// Rules for player-built bodies (the Lab).
+// ---------------------------------------------------------------------------
+export const LIMITS = { minJoints: 3, maxJoints: 12, maxBones: 18, minMuscles: 1, maxMuscles: 8, minLen: 8, maxLen: 110, radius: 140 };
+
+/** Problems that stop a body from being evolved, in plain language (empty = fine). */
+export function validateSpec(spec: CreatureSpec): string[] {
+  const errs: string[] = [];
+  const n = spec.joints.length;
+  if (n < LIMITS.minJoints) errs.push(`Needs at least ${LIMITS.minJoints} joints.`);
+  if (n > LIMITS.maxJoints) errs.push(`At most ${LIMITS.maxJoints} joints.`);
+  if (spec.bones.length > LIMITS.maxBones) errs.push(`At most ${LIMITS.maxBones} bones.`);
+  if (spec.muscles.length < LIMITS.minMuscles) errs.push('Needs at least one muscle, or it can never move.');
+  if (spec.muscles.length > LIMITS.maxMuscles) errs.push(`At most ${LIMITS.maxMuscles} muscles.`);
+  const len = (a: number, b: number) => Math.hypot(spec.joints[a].x - spec.joints[b].x, spec.joints[a].y - spec.joints[b].y);
+  for (const b of [...spec.bones, ...spec.muscles]) {
+    const L = len(b.a, b.b);
+    if (L < LIMITS.minLen) { errs.push('Two connected joints are too close together.'); break; }
+    if (L > LIMITS.maxLen) { errs.push('A bone or muscle is too long.'); break; }
+  }
+  // Every joint must be held by bones into one body (muscles alone don't count).
+  if (n) {
+    const seen = new Set([0]); const stack = [0];
+    while (stack.length) {
+      const u = stack.pop()!;
+      for (const b of spec.bones) {
+        const v = b.a === u ? b.b : b.b === u ? b.a : -1;
+        if (v >= 0 && !seen.has(v)) { seen.add(v); stack.push(v); }
+      }
+    }
+    if (seen.size < n) errs.push('Some joints are not connected to the body by bones.');
+  }
+  if (spec.head < 0 || spec.head >= n) errs.push('Choose a head joint.');
+  return errs;
+}
+
+/** A deep copy (specs are plain data, so JSON round-tripping is enough). */
+export function cloneSpec(spec: CreatureSpec): CreatureSpec { return JSON.parse(JSON.stringify(spec)); }

@@ -221,6 +221,38 @@ results bit for bit (the fingerprint test proves it), about 2.5× faster trainin
 
 ---
 
+## 6. Stage 3: research, the Lab, and the full loop
+
+### What the research changed (see RESEARCH.md for sources)
+- **Opponents from history, not just the latest.** OpenAI's sumo agents trained against their
+  newest rival became lopsided; sampling *old* versions worked better. `src/evo/schedule.ts` now
+  picks one hall-of-fame opponent from the recent half and one from the whole history.
+- **Curricula.** Early on, generous "shaping" bonuses (be close, push outward) give clueless
+  brains a slope to climb; they fade over 20 generations so winning matters most. Start positions
+  also get more random over time. We keep 30% of the shaping instead of fading to zero, because
+  our own experiment showed champions otherwise stopped bothering to push the Buoy. *Research ideas
+  still have to be tested on your own problem.*
+- **Effort cost.** A tiny penalty for twitching muscles makes motion smoother.
+
+### The Lab (`src/ui/lab.ts`)
+- The editor keeps the body as plain data (`CreatureSpec`) and redraws it every frame with the
+  same organism renderer used in fights, plus a skeleton overlay.
+- Pointer events (`pointerdown/move/up`) work for mouse and touch alike. `setPointerCapture` keeps
+  the drag going even if the pointer leaves the canvas.
+- **Undo** is a stack of JSON snapshots: before each edit, push a copy; undo pops it back.
+- **Validation** (`validateSpec` in `creature.ts`) runs a depth-first search over bones to check that
+  every joint is attached to the body. Muscles alone don't hold a body together.
+- **Test swim** spawns the body in a private physics world and drives every muscle with a sine wave,
+  phase-shifted per muscle, so you see whether the shape can move at all before evolving a brain.
+
+### Saving (`src/ui/save.ts`)
+`localStorage` is a small key-value store in the browser. We save the body and the champion's
+genome (a few hundred numbers). Every access is wrapped in `try/catch`, because private browsing
+can block storage. On "Continue", `Evolution.seedWith()` fills the new population with the saved
+champion and mutated copies of it.
+
+---
+
 ## Glossary
 
 ### Git terms
@@ -257,6 +289,8 @@ results bit for bit (the fingerprint test proves it), about 2.5× faster trainin
 - **Headless** — running without a visible window or screen.
 - **requestAnimationFrame** — asks the browser to call your function before the next screen repaint; the heartbeat of a web game loop.
 - **devicePixelRatio** — how many physical pixels per CSS pixel (2 on most phones); we scale the canvas so it stays sharp.
+- **localStorage** — a per-site key-value store in the browser; survives reloads, not shared between devices.
+- **Curriculum** — training that starts easy and gets harder (or less helped) over time.
 - **Hall of fame / self-play** — training against copies of your own past champions.
 - **Broadphase** — a cheap first check (e.g. bounding boxes) that rules out most collision pairs before the expensive exact check.
 - **CSS custom property** — a variable in CSS (`--c-mint: #8fe3c0;` then `var(--c-mint)`).

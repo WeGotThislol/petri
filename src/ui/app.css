@@ -104,3 +104,67 @@ html, body { height: 100%; overflow: hidden; }
   .versus { top: 56px; gap: 10px; }
   .versus .label i, .versus .label small { display: none; }
 }
+
+/* ---- step bar as navigation (after the first fight) ---- */
+.steps li.nav { cursor: pointer; pointer-events: auto; }
+.steps li.nav:hover { color: var(--c-bone); }
+
+/* ---- segmented controls, evolve extras ---- */
+.seg { display: inline-flex; gap: 4px; }
+.seg .btn-quiet { min-height: 32px; padding: 6px 10px; font-size: 12px; }
+.seg .btn-quiet.on { border-color: var(--c-amber); color: var(--c-bone); }
+.evo-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: var(--s-md); }
+.evo-controls .btn-quiet { min-height: 32px; padding: 6px 10px; font-size: 12px; }
+.pop-dots.pickable i { cursor: pointer; width: 8px; height: 8px; }
+.pop-dots.pickable i:hover { outline: 1px solid var(--c-bone); outline-offset: 1px; }
+.watching { display: grid; gap: 6px; margin-top: var(--s-sm); padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--r-sm); font-size: var(--t-sm); color: var(--c-inkSoft); }
+.watching div, .watching { grid-template-columns: 1fr; }
+.watching .btn-quiet { min-height: 32px; padding: 6px 10px; font-size: 12px; justify-self: start; }
+
+/* ---- fight extras ---- */
+.opp-pick { position: absolute; top: 152px; left: 50%; transform: translateX(-50%); }
+.fight-speed { position: absolute; right: 32px; bottom: 28px; }
+
+/* ---- pick: secondary action next to the main one ---- */
+.panel.pick .row-btns { gap: var(--s-md); }
+
+/* ---- the Lab ---- */
+.screen-lab { background: rgba(11, 10, 18, .55); }
+.lab { position: absolute; inset: 76px 24px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--s-md); }
+.lab-stage { display: flex; flex-direction: column; gap: var(--s-sm); padding: var(--s-md); min-height: 0; }
+.lab-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tool { appearance: none; cursor: pointer; font: 500 var(--t-sm)/1 var(--f-ui); letter-spacing: .04em; color: var(--c-inkSoft); background: transparent; border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 9px 14px; transition: border-color var(--d-base) var(--e-out), color var(--d-base) var(--e-out); }
+.tool:hover { color: var(--c-bone); border-color: rgba(233, 224, 207, .3); }
+.tool.on { color: #1a1209; background: var(--c-amber); border-color: var(--c-amber); }
+.lab-tools .divider { width: 1px; height: 24px; background: var(--hairline); margin: 0 4px; }
+.lab-canvas-wrap { flex: 1; min-height: 0; position: relative; }
+.lab-canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: var(--r-md); touch-action: none; cursor: crosshair; }
+.lab-help { margin: 0; font-size: var(--t-sm); color: var(--c-inkFaint); }
+.lab-side { overflow: auto; display: flex; flex-direction: column; gap: var(--s-sm); }
+.lab-side h2 { font-size: var(--t-xl); }
+.lab-side h2 i { font-style: italic; }
+.lab-side .fine { margin: 0; }
+.lab-block { border-top: 1px solid var(--hairline); padding-top: var(--s-sm); display: grid; gap: 8px; }
+.lab-block h3 { font: 600 11px/1 var(--f-ui); letter-spacing: .2em; text-transform: uppercase; color: var(--c-inkFaint); }
+.templates { display: flex; flex-wrap: wrap; gap: 6px; }
+.templates .btn-quiet { min-height: 32px; padding: 6px 10px; font-size: 12px; }
+.sense { display: flex; gap: 10px; align-items: flex-start; font-size: var(--t-sm); color: var(--c-inkSoft); cursor: pointer; }
+.sense input { accent-color: var(--c-amber); margin-top: 3px; }
+.sense b { color: var(--c-bone); font-weight: 600; margin-right: 4px; }
+.swatches { display: flex; gap: 8px; }
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--hairline); background: var(--sw); cursor: pointer; opacity: .8; transition: opacity var(--d-base) var(--e-out); }
+.swatch.on { outline: 1px solid var(--c-bone); outline-offset: 3px; opacity: 1; }
+.lab-side select { font: inherit; font-size: var(--t-sm); background: var(--c-ink); color: var(--c-bone); border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 6px; }
+.lab-errors { margin: 0; padding-left: 18px; color: var(--c-ember); font-size: var(--t-sm); }
+.lab-errors:empty { display: none; }
+.lab-side .btn { width: 100%; margin-top: var(--s-sm); }
+.back-link { align-self: center; }
+
+@media (max-width: 760px) {
+  .lab { inset: 56px 8px 8px; grid-template-columns: 1fr; grid-template-rows: minmax(300px, 52vh) max-content; overflow: auto; }
+  .lab-side { overflow: visible; }
+  .lab-stage { padding: 8px; }
+  .tool { padding: 8px 10px; }
+  .opp-pick { top: 100px; }
+  .fight-speed { right: 12px; bottom: auto; top: 100px; display: none; }
+}

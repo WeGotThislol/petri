@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 3: research pass, the Lab, full Evolve and Fight screens
+- Research pass (`docs/RESEARCH.md`, `docs/CREDITS.md`): OpenAI multi-agent sumo, Karl Sims, NEAT, Lehman et al., and 7 hobby projects. No code copied; licences recorded.
+- Engine changes from the research: hall-of-fame opponents sampled from the recent half + whole history; shaping bonuses annealed to a 0.3 floor over 20 generations; start-position randomisation curriculum (30% → 100%); small effort cost for twitching. 30-generation proof: push-outs vs the Buoy reach 65–90% by gens 24–29 (was 35%); the chart was regenerated.
+- The Lab (`src/ui/lab.ts`): drag-and-snap builder with Joint / Bone / Muscle / Head / Erase tools, 8 templates, undo, sense-organ toggles, pigment and markings, auto-generated Latin species names (`src/sim/names.ts`), plain-language validation (`validateSpec`), and a live "Test swim". Phone layout.
+- Sense organs are real: a body built without a sense gets zeros for those brain inputs.
+- Evolve screen after the first fight: watch speed 1×/5×/20×/50×, pause/resume, Parameters drawer, variants ranked best-first; click any variant to watch it and "Adopt as champion".
+- Fight screen: choose the opponent (the Buoy, a sparring partner from your own hall of fame, or the ancestor), 1×/3× speed, result copy per opponent.
+- The step bar becomes navigation after the first fight. Progress (body + champion brain) is saved in localStorage; "Continue with …" resumes the lineage from the saved champion.
+- Tests: 28 (new: Lab rules, sense organs, names, resuming). New walkthrough script `scripts/stage3-flow.mjs`.
+
 ## Design correction (v2): warm and handmade, but grown-up
 - `docs/DESIGN.md` gains a "v2 correction" section with DO / DON'T lists; `src/ui/tokens.ts` rewritten (deep inks, muted organism pigments, amber + ember accents, Cormorant Garamond / Source Sans 3 / faint Caveat marginalia, 6–12px radii, weighty easing with no overshoot).
 - Creatures: faces removed entirely. Now translucent organisms: layered glassy flesh, a fusiform torso swept along the spine, visible inner skeleton, rim light, gene markings (bands, speckles, stripes, gradient), sensor lights that react to the real sensor inputs (amber = opponent ahead, ember = rim close, pale = touch), and a neural pulse driven by real hidden-neuron activity. Knocked-out bodies dim and drift; winners carry more light.

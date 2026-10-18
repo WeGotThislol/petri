@@ -10,7 +10,7 @@
   },
   {
    "generation": 1,
-   "vsGen0": 1,
+   "vsGen0": 0.5,
    "pushVsDummy": 0
   },
   {
@@ -25,83 +25,83 @@
   },
   {
    "generation": 4,
-   "vsGen0": 0.975,
-   "pushVsDummy": 0
+   "vsGen0": 1,
+   "pushVsDummy": 0.05
   },
   {
    "generation": 5,
    "vsGen0": 1,
-   "pushVsDummy": 0
+   "pushVsDummy": 0.05
   },
   {
    "generation": 6,
-   "vsGen0": 0.95,
-   "pushVsDummy": 0.1
+   "vsGen0": 1,
+   "pushVsDummy": 0
   },
   {
    "generation": 7,
-   "vsGen0": 0.975,
+   "vsGen0": 1,
    "pushVsDummy": 0
   },
   {
    "generation": 8,
    "vsGen0": 1,
-   "pushVsDummy": 0.05
+   "pushVsDummy": 0.25
   },
   {
    "generation": 9,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.1
   },
   {
    "generation": 10,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.5
   },
   {
    "generation": 11,
-   "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "vsGen0": 0.975,
+   "pushVsDummy": 0.2
   },
   {
    "generation": 12,
    "vsGen0": 1,
-   "pushVsDummy": 0.3
+   "pushVsDummy": 0.45
   },
   {
    "generation": 13,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.1
   },
   {
    "generation": 14,
    "vsGen0": 1,
-   "pushVsDummy": 0.25
+   "pushVsDummy": 0
   },
   {
    "generation": 15,
    "vsGen0": 1,
-   "pushVsDummy": 0.25
+   "pushVsDummy": 0.15
   },
   {
    "generation": 16,
    "vsGen0": 1,
-   "pushVsDummy": 0.3
+   "pushVsDummy": 0
   },
   {
    "generation": 17,
-   "vsGen0": 1,
-   "pushVsDummy": 0.3
+   "vsGen0": 0.875,
+   "pushVsDummy": 0.05
   },
   {
    "generation": 18,
    "vsGen0": 1,
-   "pushVsDummy": 0.25
+   "pushVsDummy": 0
   },
   {
    "generation": 19,
    "vsGen0": 1,
-   "pushVsDummy": 0.3
+   "pushVsDummy": 0.4
   },
   {
    "generation": 20,
@@ -111,47 +111,47 @@
   {
    "generation": 21,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0
   },
   {
    "generation": 22,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0
   },
   {
    "generation": 23,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.9
   },
   {
    "generation": 24,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.9
   },
   {
    "generation": 25,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0
   },
   {
    "generation": 26,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.4
   },
   {
    "generation": 27,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.65
   },
   {
    "generation": 28,
    "vsGen0": 1,
-   "pushVsDummy": 0.4
+   "pushVsDummy": 0.65
   },
   {
    "generation": 29,
    "vsGen0": 1,
-   "pushVsDummy": 0.35
+   "pushVsDummy": 0.65
   }
  ]
 }

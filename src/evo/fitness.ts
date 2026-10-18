@@ -24,6 +24,10 @@ export interface EvalJob {
   spec: CreatureSpec;
   shape: BrainShape;
   games: { opp: Opponent; seed: number }[];
+  /** Weight of the dense shaping bonuses (1 = full, annealed toward 0 during training). */
+  shaping?: number;
+  /** Start-position randomness (1 = normal). */
+  jitter?: number;
 }
 
 /** Helper: every opponent × every seed. */
@@ -69,16 +73,23 @@ const CAMP_RADIUS = 0.33;      // …(this fraction of the ring radius) without 
  *   idle:    doing nothing and hoping the opponent falls out → −0.2.
  *   camping: parking in the middle and waiting for the rim to shrink,
  *            without ever engaging → −0.2.
+ * Plus a small effort cost for twitching (see below).
  */
 export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponent, seed: number): MatchScore {
   const me = new Brain(job.shape, genome);
-  const m = new Match(job.spec, opp.spec, [me, makeController(opp)], seed);
+  const m = new Match(job.spec, opp.spec, [me, makeController(opp)], seed, { jitter: job.jitter ?? 1 });
   const start = m.com(1);
   const oppStartR = Math.hypot(start.x, start.y);
-  let closeness = 0, samples = 0, path = 0, inMiddle = 0;
+  let closeness = 0, samples = 0, path = 0, inMiddle = 0, twitch = 0;
   let last = m.com(0);
+  const prevOut = new Float64Array(m.outputs[0].length);
   while (!m.result) {
     m.step();
+    // Effort: how abruptly the muscle commands change from tick to tick.
+    const out = m.outputs[0];
+    let d = 0;
+    for (let k = 0; k < out.length; k++) { d += Math.abs(out[k] - prevOut[k]); prevOut[k] = out[k]; }
+    twitch += d / Math.max(1, out.length);
     if (m.tick % 4 === 0) {
       const a = m.com(0), b = m.com(1);
       samples++;
@@ -100,8 +111,14 @@ export function scoreMatch(job: EvalJob, genome: ArrayLike<number>, opp: Opponen
     // which even a brain that does nothing can sometimes do.
     score += isPush(m) ? 1 : 0.45;
   } else if (r.winner === -1) score += 0.2;
-  score += 0.25 * clamp(pushed, -0.5, 1);
-  score += 0.15 * (closeness / Math.max(1, samples));
+  // Dense "shaping" bonuses help clueless early generations, then fade out so
+  // the real goal (winning) dominates: an exploration curriculum (docs/RESEARCH.md).
+  const shaping = job.shaping ?? 1;
+  score += shaping * 0.25 * clamp(pushed, -0.5, 1);
+  score += shaping * 0.15 * (closeness / Math.max(1, samples));
+  // A small cost for frantic twitching: smoother, more natural motion, and less
+  // incentive to farm integration error the way Karl Sims' swimmers did.
+  score -= 0.1 * (twitch / Math.max(1, m.tick));
 
   let flag: MatchScore['flag'] = null;
   if (path < IDLE_PATH * RING_RADIUS) { score -= 0.2; flag = 'idle'; }

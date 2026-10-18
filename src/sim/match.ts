@@ -66,12 +66,17 @@ export class Match {
   /** Tick of the last contact between the two creatures (-1 = never touched). */
   lastContactTick = -1;
 
-  constructor(specA: CreatureSpec, specB: CreatureSpec, readonly controllers: [Controller, Controller], seed: number) {
+  /**
+   * @param opts.jitter scales the random start variation (1 = normal). Training
+   *   starts small and grows it (a "randomisation curriculum", see docs/RESEARCH.md).
+   */
+  constructor(specA: CreatureSpec, specB: CreatureSpec, readonly controllers: [Controller, Controller], seed: number, opts: { jitter?: number } = {}) {
     // The seed adds small random variations to the start, so each match differs
     // slightly while staying perfectly reproducible.
     const rng = new Rng(seed);
-    const jitter = () => rng.range(-12, 12);
-    const turn = () => rng.range(-0.15, 0.15); // rotation parameter, ±17°
+    const j = opts.jitter ?? 1;
+    const jitter = () => rng.range(-12, 12) * j;
+    const turn = () => rng.range(-0.15, 0.15) * j; // rotation parameter, ±17° at full jitter
     this.creatures = [
       spawn(this.world, specA, 0, -START_DIST + jitter(), jitter(), turn(), false),
       spawn(this.world, specB, 1, START_DIST + jitter(), jitter(), turn(), true),
@@ -167,6 +172,14 @@ export class Match {
       const ex = b.x - a.x, ey = b.y - a.y; // (no ** operator: pow() is not exact)
       const L = Math.sqrt(ex * ex + ey * ey);
       inp[NUM_BASE_SENSORS + m] = (L / mu.rest - 1) / PHYS.muscleRange;
+    }
+
+    // Sense organs the designer left out read as zero: the brain is blind to them.
+    const sn = c.spec.senses;
+    if (sn) {
+      if (!sn.opponent) { inp[S.OPP_FWD] = 0; inp[S.OPP_SIDE] = 0; inp[S.OPP_DIST] = 0; inp[S.OPP_RIM] = 0; }
+      if (!sn.edge) { inp[S.RIM] = 0; inp[S.CTR_FWD] = 0; inp[S.CTR_SIDE] = 0; }
+      if (!sn.touch) inp[S.TOUCH] = 0;
     }
   }
 
