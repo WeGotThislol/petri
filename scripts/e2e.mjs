@@ -25,9 +25,9 @@ await page.evaluate(() => { for (let i = 0; i < 120; i++) window.petri.advance(1
 const tick = await page.evaluate(() => window.petri.match.tick);
 tick >= 100 ? console.log(`ok  game advanced to tick ${tick}`) : fail(`game stuck at tick ${tick}`);
 const lit = await page.evaluate(() => {
-  const c = document.querySelector('#dish'); const g = c.getContext('2d');
+  const c = document.querySelector('#stage'); const g = c.getContext('2d');
   const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
-  for (let i = 0; i < d.length; i += 4) if (d[i + 1] > 150) n++; // bright green-ish pixels = glowing creature/UI
+  for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 150) n++; // bright warm pixels = creature skin (peach, sky…)
   return n;
 });
 lit > 200 ? console.log(`ok  canvas draws (${lit} bright pixels)`) : fail(`canvas looks blank (${lit} bright pixels)`);

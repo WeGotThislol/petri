@@ -28,16 +28,12 @@ export class PusherController implements Controller {
 }
 
 /**
- * The dummy: drifts back toward the centre of the dish with a lazy tail
- * wiggle. It never attacks; it just resists being pushed out.
+ * The dummy (Globby): a sleepy target that just sits there. (It looks alive
+ * because the renderer makes it breathe and blink.) Early on, the only
+ * honest way to beat it is to swim over and push it out.
  */
 export class DummyController implements Controller {
-  act(inp: Float64Array, out: Float64Array): void {
-    const beat = inp[S.CLOCK_A] * 0.6;
-    const homeSick = inp[S.RIM] < 0.5 ? 0.8 * (inp[S.CTR_SIDE] >= 0 ? 1 : -1) : 0;
-    out[0] = clamp(-beat + homeSick);
-    out[1] = clamp(beat - homeSick);
-  }
+  act(_inp: Float64Array, out: Float64Array): void { out.fill(0); }
 }
 
 /** Does nothing at all: all muscles relaxed. */

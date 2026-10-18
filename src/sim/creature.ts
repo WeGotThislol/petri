@@ -10,8 +10,26 @@ export interface JointSpec { x: number; y: number; r: number }
 export interface BoneSpec { a: number; b: number }
 export interface MuscleSpec { a: number; b: number; strength: number }
 
+/**
+ * Appearance genes. They never affect physics; they only tell the renderer
+ * how to paint the creature. Colours are names from the design palette
+ * (see src/ui/tokens.ts), so any combination stays harmonious.
+ */
+export interface Look {
+  body: 'peach' | 'coral' | 'butter' | 'mint' | 'lavender' | 'sky';
+  accent: 'peach' | 'coral' | 'butter' | 'mint' | 'lavender' | 'sky';
+  pattern: 'plain' | 'spots' | 'stripes' | 'belly' | 'freckles';
+  /** Eye size multiplier, roughly 0.85 to 1.25. Big eyes = extra cute. */
+  eyes: number;
+  /** Seed for small pattern details (spot positions etc.). */
+  seed: number;
+}
+
 export interface CreatureSpec {
   name: string;
+  /** A friendly short name, e.g. "Bloop". */
+  nick?: string;
+  look?: Look;
   joints: JointSpec[];
   bones: BoneSpec[];
   muscles: MuscleSpec[];
@@ -60,6 +78,8 @@ export function spawn(world: World, spec: CreatureSpec, body: number, x: number,
  */
 export const CRAB: CreatureSpec = {
   name: 'Brachiopus vorax',
+  nick: 'Bloop',
+  look: { body: 'peach', accent: 'coral', pattern: 'spots', eyes: 1.1, seed: 3 },
   head: 0,
   joints: [
     { x: 30, y: 0, r: 9 },    // 0 head
@@ -88,20 +108,151 @@ export const CRAB: CreatureSpec = {
 /** The scripted sparring dummy: a round, heavy-ish blob with a short tail. */
 export const DUMMY: CreatureSpec = {
   name: 'Globulus inertis',
+  nick: 'Globby',
+  look: { body: 'sky', accent: 'lavender', pattern: 'belly', eyes: 0.9, seed: 7 },
   head: 0,
   joints: [
     { x: 26, y: 0, r: 10 },   // 0 front
     { x: 0, y: -24, r: 10 },  // 1 left
     { x: 0, y: 24, r: 10 },   // 2 right
     { x: -26, y: 0, r: 10 },  // 3 back
-    { x: -54, y: 0, r: 6 },   // 4 tail tip
+    { x: -50, y: 0, r: 7 },   // 4 tail middle
+    { x: -74, y: 0, r: 5 },   // 5 tail tip (a two-part tail swims; a one-part tail just paddles backwards)
   ],
   bones: [
     { a: 0, b: 1 }, { a: 1, b: 3 }, { a: 3, b: 2 }, { a: 2, b: 0 }, { a: 0, b: 3 },
-    { a: 3, b: 4 },
+    { a: 3, b: 4 }, { a: 4, b: 5 },
   ],
   muscles: [
     { a: 1, b: 4, strength: 0.5 },
     { a: 2, b: 4, strength: 0.5 },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// More bodies. Each is "a stiff core + limbs that muscles can swing".
+// Muscles always span a joint (they connect two points on either side of it),
+// like real muscles, so they can bend it.
+// ---------------------------------------------------------------------------
+
+/** A tadpole: small round head, long whippy tail. */
+export const TADPOLE: CreatureSpec = {
+  name: 'Caudata wriggla',
+  nick: 'Wriggle',
+  look: { body: 'mint', accent: 'sky', pattern: 'stripes', eyes: 1.25, seed: 11 },
+  head: 0,
+  joints: [
+    { x: 26, y: 0, r: 11 }, { x: 6, y: -14, r: 10 }, { x: 6, y: 14, r: 10 }, { x: -14, y: 0, r: 9 },
+    { x: -42, y: 0, r: 7 }, { x: -68, y: 0, r: 5.5 }, { x: -92, y: 0, r: 4.5 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 0, b: 2 }, { a: 1, b: 2 }, { a: 1, b: 3 }, { a: 2, b: 3 },
+    { a: 3, b: 4 }, { a: 4, b: 5 }, { a: 5, b: 6 },
+  ],
+  muscles: [
+    { a: 1, b: 4, strength: 1 }, { a: 2, b: 4, strength: 1 },
+    { a: 1, b: 5, strength: 0.5 }, { a: 2, b: 5, strength: 0.5 },
+  ],
+};
+
+/** A paddler (the "hopper"): a round body that rows with two big flippers. */
+export const PADDLER: CreatureSpec = {
+  name: 'Remipes saltator',
+  nick: 'Hop',
+  look: { body: 'butter', accent: 'peach', pattern: 'freckles', eyes: 1.05, seed: 5 },
+  head: 0,
+  joints: [
+    { x: 22, y: 0, r: 10 }, { x: 0, y: -17, r: 10 }, { x: 0, y: 17, r: 10 }, { x: -22, y: 0, r: 10 },
+    { x: -18, y: -50, r: 7 }, { x: -18, y: 50, r: 7 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 0, b: 2 }, { a: 1, b: 3 }, { a: 2, b: 3 }, { a: 1, b: 2 },
+    { a: 1, b: 4 }, { a: 2, b: 5 },
+  ],
+  muscles: [
+    { a: 0, b: 4, strength: 0.8 }, { a: 3, b: 4, strength: 0.8 },
+    { a: 0, b: 5, strength: 0.8 }, { a: 3, b: 5, strength: 0.8 },
+  ],
+};
+
+/** A spinner: a triangular core with three swinging arms. */
+export const SPINNER: CreatureSpec = {
+  name: 'Trirotor giddius',
+  nick: 'Whirl',
+  look: { body: 'lavender', accent: 'coral', pattern: 'spots', eyes: 1.0, seed: 9 },
+  head: 0,
+  joints: [
+    { x: 16, y: 0, r: 11 }, { x: -8, y: -14, r: 11 }, { x: -8, y: 14, r: 11 },
+    { x: 34, y: 24, r: 6 }, { x: 4, y: -40, r: 6 }, { x: -38, y: 14, r: 6 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 0 },
+    { a: 0, b: 3 }, { a: 1, b: 4 }, { a: 2, b: 5 },
+  ],
+  muscles: [
+    { a: 2, b: 3, strength: 0.9 }, { a: 0, b: 4, strength: 0.9 }, { a: 1, b: 5, strength: 0.9 },
+  ],
+};
+
+/** A big-clawed crab variant with a stubby tail. */
+export const SNIPPER: CreatureSpec = {
+  name: 'Forcipula grandis',
+  nick: 'Snip',
+  look: { body: 'coral', accent: 'butter', pattern: 'belly', eyes: 0.95, seed: 13 },
+  head: 0,
+  joints: [
+    { x: 28, y: 0, r: 10 }, { x: 0, y: -20, r: 9 }, { x: 0, y: 20, r: 9 }, { x: -20, y: 0, r: 8 },
+    { x: -46, y: 0, r: 6 }, { x: 56, y: -40, r: 8 }, { x: 56, y: 40, r: 8 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 0, b: 2 }, { a: 1, b: 2 }, { a: 1, b: 3 }, { a: 2, b: 3 },
+    { a: 3, b: 4 }, { a: 1, b: 5 }, { a: 2, b: 6 },
+  ],
+  muscles: [
+    { a: 1, b: 4, strength: 0.8 }, { a: 2, b: 4, strength: 0.8 },
+    { a: 0, b: 5, strength: 1 }, { a: 0, b: 6, strength: 1 },
+  ],
+};
+
+/** A jelly: a plump five-sided bell with two trailing tentacles. */
+export const JELLY: CreatureSpec = {
+  name: 'Medusella pufficans',
+  nick: 'Puff',
+  look: { body: 'sky', accent: 'mint', pattern: 'freckles', eyes: 1.15, seed: 17 },
+  head: 0,
+  joints: [
+    { x: 22, y: 0, r: 11 }, { x: 6, y: -20, r: 11 }, { x: -16, y: -13, r: 11 }, { x: -16, y: 13, r: 11 }, { x: 6, y: 20, r: 11 },
+    { x: -46, y: -16, r: 6 }, { x: -46, y: 16, r: 6 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 3 }, { a: 3, b: 4 }, { a: 4, b: 0 }, { a: 0, b: 2 }, { a: 0, b: 3 },
+    { a: 2, b: 5 }, { a: 3, b: 6 },
+  ],
+  muscles: [
+    { a: 1, b: 5, strength: 0.7 }, { a: 3, b: 5, strength: 0.7 },
+    { a: 4, b: 6, strength: 0.7 }, { a: 2, b: 6, strength: 0.7 },
+  ],
+};
+
+/** A long eel (the "snake"): tiny head, very long body. */
+export const EEL: CreatureSpec = {
+  name: 'Longissimus maximus',
+  nick: 'Longboi',
+  look: { body: 'butter', accent: 'mint', pattern: 'stripes', eyes: 0.9, seed: 19 },
+  head: 0,
+  joints: [
+    { x: 30, y: 0, r: 9 }, { x: 12, y: -11, r: 8.5 }, { x: 12, y: 11, r: 8.5 }, { x: -6, y: 0, r: 8.5 },
+    { x: -32, y: 0, r: 8 }, { x: -58, y: 0, r: 7 }, { x: -84, y: 0, r: 6 }, { x: -108, y: 0, r: 4.5 },
+  ],
+  bones: [
+    { a: 0, b: 1 }, { a: 0, b: 2 }, { a: 1, b: 2 }, { a: 1, b: 3 }, { a: 2, b: 3 },
+    { a: 3, b: 4 }, { a: 4, b: 5 }, { a: 5, b: 6 }, { a: 6, b: 7 },
+  ],
+  muscles: [
+    { a: 1, b: 4, strength: 1 }, { a: 2, b: 4, strength: 1 },
+    { a: 1, b: 5, strength: 0.6 }, { a: 2, b: 5, strength: 0.6 },
+  ],
+};
+
+/** Every body, for the creature sheet and (later) the Lab's template picker. */
+export const ALL_BODIES: CreatureSpec[] = [CRAB, TADPOLE, PADDLER, SPINNER, DUMMY, SNIPPER, JELLY, EEL];

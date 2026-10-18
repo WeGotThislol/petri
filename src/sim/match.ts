@@ -19,12 +19,12 @@ import { Rng } from './rng';
 // "game time" runs 1.5x faster than wall-clock time: lively, but still readable.
 export const TICK = 1 / 40;
 export const SUBSTEPS = 4;
-export const RING_RADIUS = 280;
+export const RING_RADIUS = 230;
 export const SHRINK_START = 15;        // seconds
 export const MATCH_TIME = 30;          // seconds
-export const RING_MIN = 80;            // radius at MATCH_TIME
+export const RING_MIN = 70;            // radius at MATCH_TIME
 export const CLOCK_PERIOD = 12;       // ticks per beat of the built-in clock
-export const START_DIST = 105;         // each creature starts this far from centre
+export const START_DIST = 85;         // each creature starts this far from centre
 
 /** Indices into the sensor vector. After these come one value per muscle. */
 export const S = {
@@ -63,6 +63,8 @@ export class Match {
   result: MatchResult | null = null;
   /** Contacts from the most recent tick (for rendering effects). */
   contacts: Contact[] = [];
+  /** Tick of the last contact between the two creatures (-1 = never touched). */
+  lastContactTick = -1;
 
   constructor(specA: CreatureSpec, specB: CreatureSpec, private controllers: [Controller, Controller], seed: number) {
     // The seed adds small random variations to the start, so each match differs
@@ -94,6 +96,7 @@ export class Match {
     }
     this.world.step(TICK, SUBSTEPS);
     this.contacts = this.world.contacts;
+    if (this.contacts.length) this.lastContactTick = this.tick;
     this.tick++;
     this.judge();
   }

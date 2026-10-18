@@ -115,6 +115,48 @@ between the last two ticks so motion looks smooth at any refresh rate.
 
 ---
 
+## 3. Design pass: tokens, creature art, and the first evolution
+
+### Design tokens (one file restyles everything)
+`src/ui/tokens.ts` holds every colour, font, size and animation curve.
+`applyTokens()` copies them into CSS *custom properties* (`--c-mint`, `--f-ui`, …)
+so stylesheets write `color: var(--c-mint)`, and the canvas code imports the same
+object directly. Change `mint` once and every button and every canvas highlight follows.
+(C++ analogy: one `constexpr` config header included by every module.)
+
+### How a skeleton becomes a cute blob (`src/render/creatureArt.ts`)
+1. Draw every bone as a fat capsule, every joint as a disc, fill the stiff triangles:
+   overlapping shapes merge into one silhouette.
+2. Paint spots/stripes with the `source-atop` blend mode: it only paints where pixels
+   already exist, so patterns can't spill outside the body.
+3. Draw the same shapes slightly fatter in a darker colour with `destination-over`
+   ("draw *behind*"). Only a thin rim shows, which gives one smooth outline.
+4. Add the face, then stamp the whole thing onto the screen with a soft shadow and
+   a little squash-and-stretch in the direction of motion.
+The physics never sees any of this, so looks can change freely without breaking replays.
+
+### The first evolution (a preview of Stage 2)
+- **Brain** (`src/sim/brain.ts`): a tiny neural network, sensors → 10 hidden neurons
+  → one output per muscle. Each neuron computes `softsign(Σ input×weight + bias)`.
+  The *genome* is just the list of all weights (a few hundred numbers).
+- **Genetic algorithm** (`src/evo/ga.ts`): test all brains, keep the best 3 unchanged
+  (*elitism*), pick parents by mini-tournaments (*selection*), mix two parents
+  weight by weight (*crossover*), nudge ~12% of a child's weights randomly (*mutation*).
+- **Fitness** (`src/evo/fitness.ts`): points from short fights. A real push-out is
+  worth 1, outlasting the shrinking rim only 0.45, plus small bonuses for being close
+  and moving the opponent outward ("shaping", so clueless beginners have a slope to climb).
+- **Web Workers** (`src/evo/pool.ts`): the population is split across background threads
+  (one per CPU core), so the page stays smooth while hundreds of fights run.
+
+#### A real bug evolution found for us
+At first, *random* brains beat Globby nearly 100% of the time. Why? Globby's tiny wiggle
+made it slowly swim backwards, out of the dish, so it always lost when the rim shrank.
+Evolution doesn't care *how* points are earned, which is exactly the "reward hacking"
+lesson the Lab Notebook will teach later. Fix: Globby sits still, and outlasting the rim
+is worth far less than a real push.
+
+---
+
 ## Glossary
 
 ### Git terms
@@ -151,4 +193,7 @@ between the last two ticks so motion looks smooth at any refresh rate.
 - **Headless** — running without a visible window or screen.
 - **requestAnimationFrame** — asks the browser to call your function before the next screen repaint; the heartbeat of a web game loop.
 - **devicePixelRatio** — how many physical pixels per CSS pixel (2 on most phones); we scale the canvas so it stays sharp.
+- **CSS custom property** — a variable in CSS (`--c-mint: #8fe3c0;` then `var(--c-mint)`).
+- **Composite operation** — how new canvas drawing combines with what's already there (`source-atop`, `destination-over`…).
+- **Multi-page Vite build** — several HTML entry points (`index.html`, `mockup.html`, `creatures.html`) built together.
 - **tsx** — runs a TypeScript file directly in Node (`npx tsx scripts/probe.ts`), no build step.

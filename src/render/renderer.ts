@@ -2,43 +2,42 @@
  * Draws a Match on a <canvas>. It only READS the simulation; it never
  * changes it, so what you see is exactly what the headless sim computes.
  *
- * Visual language: darkfield microscopy. Near-black glass, bioluminescent
- * creatures (additive "lighter" blending makes overlapping glow add up),
- * measurement ticks and a scale bar.
+ * Look: a warm, dusky dish with a slightly wobbly hand-drawn rim, soft
+ * creatures with faces that react to the fight, dust puffs and confetti.
+ * Rendering is free to use Math.random/sin/cos: none of it feeds back into
+ * the simulation, so determinism is unaffected.
  */
-import type { CreatureSpec } from '../sim/creature';
-import { Match, RING_RADIUS, SHRINK_START } from '../sim/match';
+import { drawCreature, Expression } from './creatureArt';
+import { Match, RING_RADIUS, S, SHRINK_START } from '../sim/match';
+import { COLOR, CREATURE_COLORS, FONT, mix, rgba } from '../ui/tokens';
 
-export const COLORS = {
-  ground: '#060a12',
-  glassEdge: '#22324a',
-  hair: '#1d2a3b',
-  tick: '#2c3d52',
-  ink: '#c9d6e3',
-  inkDim: '#5d6f84',
-  accent: '#6ff2c8',   // the player's creature, UI highlights
-  pale: '#e9f1ff',     // opponents
-  warn: '#ff7a45',     // danger: the contracting rim, knockouts
-};
-const SERIF = '"Instrument Serif", Georgia, serif';
-const MONO = '"IBM Plex Mono", ui-monospace, monospace';
+const DISH_RADIUS = RING_RADIUS + 46;
 
-const DISH_RADIUS = RING_RADIUS + 50; // the glass extends past the arena edge
-const TRAIL_LEN = 50;
+interface Puff { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number; color: string; kind: 'dust' | 'confetti'; rot: number }
 
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string }
+/** Per-creature cosmetic state (blinking, mood with a little hysteresis). */
+interface Face { blinkIn: number; blinkT: number; mood: Expression; moodHold: number }
+
+export interface View { cx: number; cy: number; fill: number } // dish centre as fraction of canvas, and size factor
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private w = 0; private h = 0; private dpr = 1;
   private scale = 1; private cx = 0; private cy = 0;
   private trails: { x: number; y: number }[][] = [[], []];
-  private sparks: Spark[] = [];
+  private puffs: Puff[] = [];
+  private faces: Face[] = [newFace(), newFace()];
   private shake = 0;
-  /** Previous-tick particle positions, for smooth interpolation between ticks. */
+  private time = 0;
   private prev: Float64Array = new Float64Array(0);
-  labels: [string, string] = ['', ''];
-  colors: [string, string] = [COLORS.accent, COLORS.pale];
+  private wobble = Array.from({ length: 64 }, () => Math.random());
+  /** Which creature (0/1) gets a little "you" note, or null. */
+  youIndex: number | null = null;
+  /** Soft glow per creature (e.g. butter for a champion). */
+  glow: (string | null)[] = [null, null];
+  view: View = { cx: 0.5, cy: 0.5, fill: 1 };
+  /** Easter egg. */
+  partyHats = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -49,114 +48,142 @@ export class Renderer {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const r = this.canvas.getBoundingClientRect();
     this.w = r.width; this.h = r.height;
-    this.canvas.width = Math.round(r.width * this.dpr);
-    this.canvas.height = Math.round(r.height * this.dpr);
-    // Fit the dish into the canvas with a small margin for labels.
-    this.scale = Math.min(this.w, this.h) / (DISH_RADIUS * 2 + 40);
-    this.cx = this.w / 2; this.cy = this.h / 2;
+    this.canvas.width = Math.max(1, Math.round(r.width * this.dpr));
+    this.canvas.height = Math.max(1, Math.round(r.height * this.dpr));
+    this.scale = (Math.min(this.w, this.h) / (DISH_RADIUS * 2 + 30)) * this.view.fill;
+    this.cx = this.w * this.view.cx; this.cy = this.h * this.view.cy;
   }
 
-  /** Call right BEFORE match.step() so we can interpolate from old to new positions. */
+  setView(v: View): void { this.view = v; this.resize(); }
+
+  /** Call right BEFORE match.step(), so we can interpolate between ticks. */
   snapshot(m: Match): void {
     const ps = m.world.particles;
     if (this.prev.length !== ps.length * 2) this.prev = new Float64Array(ps.length * 2);
     for (let i = 0; i < ps.length; i++) { this.prev[i * 2] = ps[i].x; this.prev[i * 2 + 1] = ps[i].y; }
   }
 
-  /** Call right AFTER match.step(): records trails and spawns effects for this tick. */
+  /** Call right AFTER match.step(): trails and impact effects. Returns the hardest hit this tick. */
   afterStep(m: Match): { bigHit: number } {
     for (let i = 0; i < 2; i++) {
-      const c = m.creatures[i];
-      // Trail follows the joint farthest from the head (usually a tail tip): it shows the swimming stroke.
-      const tip = m.world.particles[c.particles[farthestFromHead(c.spec)]];
+      const c = m.com(i);
       const t = this.trails[i];
-      t.push({ x: tip.x, y: tip.y });
-      if (t.length > TRAIL_LEN) t.shift();
+      if (m.tick % 2 === 0) { t.push({ x: c.x, y: c.y }); if (t.length > 40) t.shift(); }
     }
     let bigHit = 0;
     for (const ct of m.contacts) {
       if (ct.speed > bigHit) bigHit = ct.speed;
-      if (ct.speed > 60) this.burst(ct.x, ct.y, 3 + Math.min(10, ct.speed / 40), COLORS.pale, ct.speed * 0.6);
+      if (ct.speed > 45) this.dust(ct.x, ct.y, 2 + Math.min(6, ct.speed / 50), ct.speed * 0.35);
     }
-    if (bigHit > 160) this.shake = Math.min(10, this.shake + bigHit / 60);
+    if (bigHit > 150) this.shake = Math.min(9, this.shake + bigHit / 70);
     return { bigHit };
   }
 
-  /** A knockout: a big burst at the loser's position. */
+  /** A knock-out: dust cloud + palette confetti. */
   knockout(m: Match, loser: number): void {
     const c = m.com(loser);
-    this.burst(c.x, c.y, 70, COLORS.warn, 420);
-    this.burst(c.x, c.y, 40, this.colors[loser], 260);
-    this.shake = 14;
+    this.dust(c.x, c.y, 18, 160);
+    const w = m.com(1 - loser);
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2, s = 80 + Math.random() * 220;
+      this.puffs.push({
+        x: w.x, y: w.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, r: 2.5 + Math.random() * 2.5,
+        life: 1.4 + Math.random(), max: 2.4, color: COLOR[CREATURE_COLORS[i % CREATURE_COLORS.length]], kind: 'confetti', rot: Math.random() * 6,
+      });
+    }
+    this.shake = 12;
   }
 
-  reset(): void { this.trails = [[], []]; this.sparks = []; this.prev = new Float64Array(0); }
+  reset(): void { this.trails = [[], []]; this.puffs = []; this.prev = new Float64Array(0); this.faces = [newFace(), newFace()]; }
 
-  private burst(x: number, y: number, n: number, color: string, speed: number): void {
+  private dust(x: number, y: number, n: number, speed: number): void {
     for (let i = 0; i < n; i++) {
-      // Rendering may use Math.random/cos: it never feeds back into the sim.
       const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random() * 0.7);
-      const max = 0.4 + Math.random() * 0.6;
-      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: max, max, color });
+      const max = 0.5 + Math.random() * 0.5;
+      this.puffs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 3 + Math.random() * 5, life: max, max, color: COLOR.cream, kind: 'dust', rot: 0 });
     }
   }
 
-  /** Draw a frame. `alpha` (0..1) = how far we are between the previous tick and the current one. */
-  draw(m: Match, alpha: number, dt: number): void {
+  /** Draw a frame. `alpha` = progress between the previous and current tick (0..1). */
+  draw(m: Match | null, alpha: number, dt: number): void {
     const { ctx } = this;
+    this.time += dt;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = COLORS.ground;
+    // Background: dusk with a soft warm pool of light where the dish is.
+    ctx.fillStyle = COLOR.dusk;
     ctx.fillRect(0, 0, this.w, this.h);
+    const glowR = DISH_RADIUS * this.scale * 1.6;
+    const bg = ctx.createRadialGradient(this.cx, this.cy, 0, this.cx, this.cy, glowR);
+    bg.addColorStop(0, rgba(mix(COLOR.dusk, COLOR.peach, 0.12), 1)); bg.addColorStop(1, rgba(COLOR.dusk, 0));
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, this.w, this.h);
 
-    // Screen shake decays quickly.
-    this.shake *= Math.pow(0.0005, dt);
+    this.shake *= Math.pow(0.0008, dt);
     const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
     ctx.save();
     ctx.translate(this.cx + sx, this.cy + sy);
     ctx.scale(this.scale, this.scale);
-
     this.drawDish(m);
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 2; i++) this.drawTrail(i);
-    for (let i = 0; i < 2; i++) this.drawCreature(m, i, alpha);
-    this.drawSparks(dt);
-    ctx.globalCompositeOperation = 'source-over';
-    this.drawLabels(m, alpha);
+    if (m) {
+      for (let i = 0; i < 2; i++) this.drawTrail(m, i);
+      // Draw the loser first so the winner is on top.
+      const order = m.result && m.result.winner === 0 ? [1, 0] : [0, 1];
+      for (const i of order) this.drawOne(m, i, alpha, dt);
+    }
+    this.drawPuffs(dt);
+    if (m && this.youIndex !== null) this.drawYou(m, this.youIndex, alpha);
     ctx.restore();
-    this.drawScaleBar();
   }
 
-  private drawDish(m: Match): void {
+  /** A wobbly circle, like it was drawn by hand (two passes = pencil feel). */
+  private wobblyCircle(r: number, amp: number, phase = 0): void {
     const { ctx } = this;
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, DISH_RADIUS);
-    g.addColorStop(0, '#0f1a2b'); g.addColorStop(0.85, '#0a1220'); g.addColorStop(1, '#16243a');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, DISH_RADIUS, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 2 / this.scale; ctx.strokeStyle = COLORS.glassEdge; ctx.stroke();
-
-    // 72 measurement ticks around the glass, longer every 30°.
-    ctx.lineWidth = 1.2 / this.scale;
-    for (let i = 0; i < 72; i++) {
-      const a = (i / 72) * Math.PI * 2, long = i % 6 === 0;
-      const r0 = DISH_RADIUS - 8, r1 = DISH_RADIUS - (long ? 20 : 13);
-      ctx.strokeStyle = long ? '#3a5372' : COLORS.glassEdge;
-      ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.stroke();
+    const n = 90;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const k = (i % n) / n * this.wobble.length;
+      const j = Math.floor(k), f = k - j;
+      const w0 = this.wobble[j % this.wobble.length], w1 = this.wobble[(j + 1) % this.wobble.length];
+      const rr = r + amp * (Math.sin(a * 3 + phase) * 0.5 + (w0 * (1 - f) + w1 * f - 0.5));
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
-    // Faint cross-hair and guide circle.
-    ctx.strokeStyle = '#111c2c'; ctx.lineWidth = 1 / this.scale;
-    ctx.beginPath(); ctx.moveTo(-RING_RADIUS, 0); ctx.lineTo(RING_RADIUS, 0); ctx.moveTo(0, -RING_RADIUS); ctx.lineTo(0, RING_RADIUS); ctx.stroke();
+    ctx.closePath();
+  }
 
-    // The arena edge. During sudden death the shrinking rim glows in the warning colour.
-    const R = m.ringRadius;
-    ctx.strokeStyle = '#3a5372'; ctx.lineWidth = 1.5 / this.scale;
-    ctx.beginPath(); ctx.arc(0, 0, RING_RADIUS, 0, Math.PI * 2); ctx.stroke();
-    if (m.time > SHRINK_START) {
+  private drawDish(m: Match | null): void {
+    const { ctx } = this;
+    const px = 1 / this.scale;
+    // Dish floor.
+    const g = ctx.createRadialGradient(-DISH_RADIUS * 0.3, -DISH_RADIUS * 0.35, 0, 0, 0, DISH_RADIUS);
+    g.addColorStop(0, mix(COLOR.surface, COLOR.peach, 0.08)); g.addColorStop(0.7, COLOR.surface); g.addColorStop(1, mix(COLOR.surface, COLOR.night, 0.35));
+    ctx.fillStyle = g;
+    this.wobblyCircle(DISH_RADIUS, 2.5); ctx.fill();
+    // Glass lip: a soft cream rim with a highlight arc.
+    ctx.lineWidth = 3 * px; ctx.strokeStyle = rgba(COLOR.cream, 0.18); ctx.stroke();
+    ctx.lineWidth = 2 * px; ctx.strokeStyle = rgba(COLOR.cream, 0.35);
+    ctx.beginPath(); ctx.arc(0, 0, DISH_RADIUS - 8, Math.PI * 1.08, Math.PI * 1.45); ctx.stroke();
+
+    // The arena edge: a hand-drawn double line.
+    ctx.strokeStyle = rgba(COLOR.inkFaint, 0.55); ctx.lineWidth = 2 * px;
+    this.wobblyCircle(RING_RADIUS, 1.6, 0.4); ctx.stroke();
+    ctx.strokeStyle = rgba(COLOR.inkFaint, 0.25); ctx.lineWidth = 1.2 * px;
+    this.wobblyCircle(RING_RADIUS + 3, 1.6, 2.1); ctx.stroke();
+    // Little hand-drawn ticks every 30°.
+    ctx.strokeStyle = rgba(COLOR.inkFaint, 0.4); ctx.lineWidth = 1.6 * px; ctx.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.05 * this.wobble[i];
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * (RING_RADIUS + 10), Math.sin(a) * (RING_RADIUS + 10));
+      ctx.lineTo(Math.cos(a) * (RING_RADIUS + 18), Math.sin(a) * (RING_RADIUS + 18)); ctx.stroke();
+    }
+
+    // Sudden death: the shrinking rim, in coral, crawling.
+    if (m && m.time > SHRINK_START) {
       ctx.save();
-      ctx.strokeStyle = COLORS.warn; ctx.lineWidth = 2 / this.scale;
-      ctx.setLineDash([14 / this.scale, 6 / this.scale]);
-      ctx.lineDashOffset = -m.tick * 0.6 / this.scale;
-      ctx.shadowColor = COLORS.warn; ctx.shadowBlur = 12;
-      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = COLOR.coral; ctx.lineWidth = 3 * px;
+      ctx.setLineDash([12 * px, 9 * px]); ctx.lineDashOffset = -m.tick * 0.5 * px;
+      ctx.shadowColor = rgba(COLOR.coral, 0.6); ctx.shadowBlur = 10;
+      this.wobblyCircle(m.ringRadius, 1.2, 1.3); ctx.stroke();
       ctx.restore();
     }
   }
@@ -167,124 +194,93 @@ export class Renderer {
     return [this.prev[i * 2] + (p.x - this.prev[i * 2]) * alpha, this.prev[i * 2 + 1] + (p.y - this.prev[i * 2 + 1]) * alpha];
   }
 
-  private drawCreature(m: Match, ci: number, alpha: number): void {
-    const { ctx } = this;
-    const c = m.creatures[ci];
-    const col = this.colors[ci];
-    const P = c.particles.map((pi) => this.pos(m, pi, alpha));
-    const lost = m.result && m.result.winner === 1 - ci;
-
-    // Soft body halo around the centre.
-    let mx = 0, my = 0; for (const [x, y] of P) { mx += x; my += y; } mx /= P.length; my /= P.length;
-    const halo = ctx.createRadialGradient(mx, my, 0, mx, my, 80);
-    halo.addColorStop(0, hexA(col, lost ? 0.03 : 0.10)); halo.addColorStop(1, hexA(col, 0));
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, 80, 0, Math.PI * 2); ctx.fill();
-
-    // Muscles: thin dashed strands, brighter when contracting.
-    ctx.setLineDash([3, 3]); ctx.lineWidth = 1.4;
-    for (const mi of c.muscles) {
-      const mu = m.world.muscles[mi];
-      const a = P[c.particles.indexOf(mu.a)], b = P[c.particles.indexOf(mu.b)];
-      ctx.strokeStyle = hexA(col, 0.25 + 0.5 * Math.max(0, -mu.act));
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-    }
-    ctx.setLineDash([]);
-
-    // Bones: a wide faint stroke (glow) under a thin bright one (core).
-    ctx.lineCap = 'round';
-    for (const pass of [{ w: 14, a: 0.07, blur: 0 }, { w: 6, a: 0.16, blur: 0 }, { w: 2.4, a: 0.95, blur: 12 }]) {
-      ctx.lineWidth = pass.w; ctx.strokeStyle = hexA(col, pass.a * (lost ? 0.5 : 1));
-      ctx.shadowColor = col; ctx.shadowBlur = pass.blur;
-      ctx.beginPath();
-      for (const b of c.spec.bones) { ctx.moveTo(P[b.a][0], P[b.a][1]); ctx.lineTo(P[b.b][0], P[b.b][1]); }
-      ctx.stroke();
-    }
-    ctx.shadowBlur = 0;
-
-    // Joints: hollow cells with a glowing membrane.
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineWidth = 1.8;
-    c.spec.joints.forEach((j, k) => {
-      ctx.fillStyle = COLORS.ground; ctx.strokeStyle = hexA(col, 0.95);
-      ctx.beginPath(); ctx.arc(P[k][0], P[k][1], j.r * 0.75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    });
-    // The head gets an "eye" (sense organ).
-    const hd = P[c.spec.head];
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(hd[0], hd[1], 2.6, 0, Math.PI * 2); ctx.fill();
-    ctx.globalCompositeOperation = 'lighter';
+  /** Pick a facial expression from what's happening in the fight. */
+  private moodFor(m: Match, i: number): Expression {
+    if (m.result) return m.result.winner === i ? 'happy' : m.result.winner === -1 ? 'idle' : 'dizzy';
+    const inp = m.inputs[i];
+    if (inp[S.RIM] < 0.16) return 'scared';
+    if (inp[S.TOUCH] > 0.05 && inp[S.OPP_FWD] > 0.2) return 'push';
+    return 'idle';
   }
 
-  private drawTrail(i: number): void {
+  private drawOne(m: Match, i: number, alpha: number, dt: number): void {
+    const c = m.creatures[i];
+    const pts = c.particles.map((pi) => this.pos(m, pi, alpha));
+    const f = this.faces[i];
+    // Blinking: every 2–5 s, for 0.14 s.
+    f.blinkIn -= dt;
+    if (f.blinkIn <= 0) { f.blinkT = 0.14; f.blinkIn = 2 + Math.random() * 3; }
+    f.blinkT = Math.max(0, f.blinkT - dt);
+    const blink = f.blinkT > 0 ? Math.sin((f.blinkT / 0.14) * Math.PI) : 0;
+    // Mood with a short hold so faces don't flicker.
+    const want = this.moodFor(m, i);
+    f.moodHold -= dt;
+    if (want !== f.mood && (f.moodHold <= 0 || m.result)) { f.mood = want; f.moodHold = 0.45; }
+    const com = m.com(i), opp = m.com(1 - i);
+    const ctx = this.ctx;
+    drawCreature(ctx, c.spec, {
+      pts, lookAt: { x: opp.x, y: opp.y }, expression: f.mood, blink,
+      vel: { x: com.vx, y: com.vy }, time: this.time + i * 1.7, glow: this.glow[i],
+    }, this.scale * this.dpr);
+    if (this.partyHats) this.drawHat(c.spec.head, pts, c.spec.joints[c.spec.head].r);
+  }
+
+  private drawHat(head: number, pts: [number, number][], r: number): void {
+    const { ctx } = this;
+    let cx = 0, cy = 0; for (const [x, y] of pts) { cx += x; cy += y; } cx /= pts.length; cy /= pts.length;
+    const [hx, hy] = pts[head];
+    const x = (hx + cx) / 2, y = (hy + cy) / 2 - r * 1.6;
+    ctx.fillStyle = COLOR.butter; ctx.strokeStyle = mix(COLOR.butter, COLOR.night, 0.6); ctx.lineWidth = 1.5 / this.scale;
+    ctx.beginPath(); ctx.moveTo(x - r, y + r * 0.6); ctx.lineTo(x, y - r * 1.6); ctx.lineTo(x + r, y + r * 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COLOR.coral; ctx.beginPath(); ctx.arc(x, y - r * 1.6, r * 0.35, 0, Math.PI * 2); ctx.fill();
+  }
+
+  private drawTrail(m: Match, i: number): void {
     const { ctx } = this;
     const t = this.trails[i];
+    const col = COLOR[m.creatures[i].spec.look?.body ?? 'peach'];
     for (let k = 1; k < t.length; k++) {
       const a = k / t.length;
-      ctx.fillStyle = hexA(this.colors[i], 0.35 * a * a);
-      ctx.beginPath(); ctx.arc(t[k].x, t[k].y, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = rgba(col, 0.22 * a * a);
+      ctx.beginPath(); ctx.arc(t[k].x, t[k].y, 2.2 + a * 1.5, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  private drawSparks(dt: number): void {
+  private drawPuffs(dt: number): void {
     const { ctx } = this;
-    for (const s of this.sparks) {
-      s.life -= dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.92; s.vy *= 0.92;
-      const a = Math.max(0, s.life / s.max);
-      ctx.fillStyle = hexA(s.color, a);
-      ctx.beginPath(); ctx.arc(s.x, s.y, 1 + 2 * a, 0, Math.PI * 2); ctx.fill();
+    for (const p of this.puffs) {
+      p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      const a = Math.max(0, p.life / p.max);
+      if (p.kind === 'dust') {
+        p.vx *= 0.9; p.vy *= 0.9; p.r += dt * 14;
+        ctx.fillStyle = rgba(p.color, 0.35 * a);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      } else {
+        p.vx *= 0.96; p.vy = p.vy * 0.96 + 120 * dt; p.rot += dt * 8;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = rgba(p.color, Math.min(1, a * 1.5));
+        ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
+        ctx.restore();
+      }
     }
-    this.sparks = this.sparks.filter((s) => s.life > 0);
+    this.puffs = this.puffs.filter((p) => p.life > 0);
   }
 
-  /** Specimen labels with a hand-drawn leader line to each creature. */
-  private drawLabels(m: Match, alpha: number): void {
+  /** A handwritten "you!" with a little arrow over the player's creature. */
+  private drawYou(m: Match, i: number, alpha: number): void {
     const { ctx } = this;
-    for (let i = 0; i < 2; i++) {
-      if (!this.labels[i]) continue;
-      const c = m.creatures[i];
-      const [hx, hy] = this.pos(m, c.particles[c.spec.head], alpha);
-      // Labels sit outside the dish so they never cover the action: to the sides
-      // on a wide screen, above/below the dish on a tall (phone) screen.
-      const portrait = this.h > this.w * 1.25;
-      const side = i === 0 ? -1 : 1;
-      const lx = portrait ? side * DISH_RADIUS * 0.45 : side * (DISH_RADIUS - 30);
-      const ly = portrait ? -side * (DISH_RADIUS + 28 / this.scale) : -side * (DISH_RADIUS - 110);
-      ctx.strokeStyle = hexA(COLORS.ink, 0.35); ctx.lineWidth = 1 / this.scale;
-      ctx.setLineDash([4 / this.scale, 4 / this.scale]);
-      ctx.beginPath(); ctx.moveTo(lx, ly);
-      ctx.quadraticCurveTo(lx * 0.6, hy + (ly - hy) * 0.2, hx, hy); ctx.stroke();
-      ctx.setLineDash([]);
-      const fs = 20 / Math.max(this.scale, 0.6);
-      ctx.font = `italic ${fs}px ${SERIF}`;
-      ctx.textAlign = portrait ? 'center' : i === 0 ? 'right' : 'left';
-      ctx.fillStyle = this.colors[i];
-      ctx.fillText(this.labels[i], lx, ly - 6 / this.scale);
-    }
-  }
-
-  private drawScaleBar(): void {
-    const { ctx } = this;
-    const len = 100 * this.scale; // 100 world units = "100 µm"
-    const narrow = this.w < 600; // on phones the bottom edge holds the controls
-    const x = this.w - len - 90, y = narrow ? 70 : this.h - 26;
-    ctx.strokeStyle = COLORS.ink; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, y); ctx.lineTo(x + len, y);
-    for (const k of [0, 0.5, 1]) { const tl = k === 0.5 ? 3 : 5; ctx.moveTo(x + len * k, y - tl); ctx.lineTo(x + len * k, y + tl); }
-    ctx.stroke();
-    ctx.fillStyle = COLORS.inkDim; ctx.font = `11px ${MONO}`; ctx.textAlign = 'left';
-    ctx.fillText('100 µm', x + len + 10, y + 4);
+    const c = m.creatures[i];
+    let minY = Infinity, sx = 0;
+    for (const pi of c.particles) { const [x, y] = this.pos(m, pi, alpha); minY = Math.min(minY, y); sx += x; }
+    const x = sx / c.particles.length, y = minY - 34 + Math.sin(this.time * 3) * 2.5;
+    const px = 1 / this.scale;
+    ctx.fillStyle = COLOR.mint; ctx.strokeStyle = COLOR.mint;
+    ctx.font = `700 ${21 * px}px ${FONT.hand}`; ctx.textAlign = 'center';
+    ctx.fillText('you!', x, y);
+    ctx.lineWidth = 2 * px; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 2, y + 5); ctx.quadraticCurveTo(x + 6, y + 13, x + 1, y + 20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 4, y + 15); ctx.lineTo(x + 1, y + 20); ctx.lineTo(x + 6, y + 16); ctx.stroke();
   }
 }
 
-/** '#rrggbb' + alpha → 'rgba(...)'. */
-function hexA(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
-}
-
-function farthestFromHead(spec: CreatureSpec): number {
-  const h = spec.joints[spec.head];
-  let best = 0, bestD = -1;
-  spec.joints.forEach((j, k) => { const d = (j.x - h.x) ** 2 + (j.y - h.y) ** 2; if (d > bestD) { bestD = d; best = k; } });
-  return best;
-}
+function newFace(): Face { return { blinkIn: 1 + Math.random() * 2, blinkT: 0, mood: 'idle', moodHold: 0 }; }
