@@ -1,11 +1,11 @@
 # Builds the game and publishes it to GitHub Pages.
-# Runs on every push to `main` (and can be started by hand from the Actions tab).
+# Runs on every push to the default branch (claude/epic-carson-walyhr) (and can be started by hand from the Actions tab).
 # One-time setup by the repo owner: Settings -> Pages -> Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [claude/epic-carson-walyhr]   # this repo's default branch
   workflow_dispatch:
 
 permissions:
