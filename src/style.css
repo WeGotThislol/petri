@@ -1,0 +1,12 @@
+:root {
+  --ground: #060a12;
+  --ink: #c9d6e3;
+  --accent: #6ff2c8;
+  --warn: #ff7a45;
+  --serif: "Instrument Serif", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+html, body { margin: 0; min-height: 100%; background: var(--ground); color: var(--ink); font: 14px/1.6 var(--mono); }
+.placeholder { max-width: 560px; margin: 18vh auto; padding: 0 16px; }
+.placeholder h1 { font: italic 64px/1 var(--serif); margin: 0 0 12px; color: #e9f1ff; font-weight: 400; }
+.placeholder a { color: var(--accent); }

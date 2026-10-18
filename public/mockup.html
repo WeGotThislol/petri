@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PETRI — main screen mockup</title>
+<!-- Stage 0 design mockup. Static HTML + SVG only; the real game renders on a canvas. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ground: #060a12;      /* near-black blue */
+    --ground-2: #0b1220;
+    --ink: #c9d6e3;         /* body text, pale slide-glass blue */
+    --ink-dim: #5d6f84;
+    --hair: #1d2a3b;        /* hairlines, ticks */
+    --accent: #6ff2c8;      /* bioluminescent green-cyan: the ONE accent */
+    --warn: #ff7a45;        /* the ONE warning colour */
+    --pale: #e9f1ff;        /* opponent creature, neutral glow */
+    --serif: "Instrument Serif", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 38% 45%, var(--ground-2) 0%, var(--ground) 60%);
+    color: var(--ink);
+    font: 13px/1.5 var(--mono);
+    overflow-x: hidden;
+  }
+  /* Film grain over everything, very faint. */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .07;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ---------- top bar ---------- */
+  header {
+    display: flex; align-items: baseline; gap: 28px; padding: 18px 28px 10px;
+    border-bottom: 1px solid var(--hair); position: relative;
+  }
+  /* measurement ticks under the header */
+  header::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 6px;
+    background: repeating-linear-gradient(90deg, var(--hair) 0 1px, transparent 1px 10px),
+                repeating-linear-gradient(90deg, #2c3d52 0 1px, transparent 1px 100px);
+  }
+  .wordmark { font: italic 34px/1 var(--serif); letter-spacing: .02em; color: var(--pale); }
+  .wordmark small { font: 11px var(--mono); color: var(--ink-dim); margin-left: 10px; letter-spacing: .08em; }
+  nav { display: flex; gap: 22px; margin-left: auto; }
+  nav a { color: var(--ink-dim); text-decoration: none; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+  nav a.on { color: var(--accent); border-bottom: 1px solid var(--accent); padding-bottom: 2px; }
+  .snd { color: var(--ink-dim); font-size: 11px; }
+
+  /* ---------- layout ---------- */
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: calc(100vh - 64px); }
+  .stage { position: relative; display: grid; place-items: center; padding: 24px; }
+  .dish { width: min(78vh, 100%); aspect-ratio: 1; }
+  aside {
+    border-left: 1px solid var(--hair); padding: 22px 24px 28px;
+    background: linear-gradient(180deg, rgba(14,22,36,.65), rgba(6,10,18,.2));
+  }
+
+  /* ---------- HUD on the stage ---------- */
+  .hud { position: absolute; font-size: 11px; color: var(--ink-dim); letter-spacing: .06em; }
+  .hud b { color: var(--ink); font-weight: 500; }
+  .tl { top: 24px; left: 28px; }
+  .tr { top: 24px; right: 28px; text-align: right; }
+  .bl { bottom: 26px; left: 28px; }
+  .br { bottom: 22px; right: 28px; text-align: right; }
+  .clock { font-size: 28px; color: var(--pale); letter-spacing: .02em; }
+  .warn { color: var(--warn); }
+  .speed { display: inline-flex; gap: 2px; margin-top: 6px; }
+  .speed span { padding: 3px 8px; border: 1px solid var(--hair); color: var(--ink-dim); }
+  .speed span.on { color: var(--ground); background: var(--accent); border-color: var(--accent); }
+
+  /* ---------- specimen labels ---------- */
+  .label {
+    position: absolute; padding: 7px 11px 8px; min-width: 150px;
+    background: rgba(233,241,255,.04); border: 1px solid #2a3a50;
+    backdrop-filter: blur(2px);
+  }
+  .label::before { /* the little punched hole of a specimen tag */
+    content: ""; position: absolute; left: 7px; top: 7px; width: 5px; height: 5px;
+    border-radius: 50%; border: 1px solid #2a3a50;
+  }
+  .label .name { font: italic 19px/1.1 var(--serif); color: var(--pale); padding-left: 10px; }
+  .label .meta { font-size: 10px; color: var(--ink-dim); letter-spacing: .08em; margin-top: 3px; }
+  .label.mine .name { color: var(--accent); }
+
+  /* ---------- notebook ---------- */
+  .nb-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--hair); padding-bottom: 8px; }
+  .nb-head h2 { margin: 0; font: italic 26px/1 var(--serif); color: var(--pale); font-weight: 400; }
+  .nb-head span { font-size: 10px; color: var(--ink-dim); letter-spacing: .12em; }
+  .entry { margin-top: 18px; }
+  .entry h3 { margin: 0 0 4px; font: italic 20px/1.2 var(--serif); font-weight: 400; color: var(--accent); }
+  .entry p { margin: 0; color: var(--ink); font-size: 12px; }
+  .entry p em { font: italic 15px var(--serif); color: var(--pale); }
+  .slider { margin: 12px 0 4px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 10px; color: var(--ink-dim); }
+  .slider .track { height: 1px; background: var(--hair); position: relative; }
+  .slider .track::before { content: ""; position: absolute; left: 0; width: 34%; top: 0; height: 1px; background: var(--accent); }
+  .slider .knob { position: absolute; left: 34%; top: -6px; width: 1px; height: 13px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .ba figure { margin: 0; border: 1px solid var(--hair); padding: 6px; }
+  .ba figcaption { font-size: 9px; letter-spacing: .1em; color: var(--ink-dim); text-transform: uppercase; }
+  button.why {
+    margin-top: 18px; width: 100%; padding: 10px; background: transparent; cursor: pointer;
+    border: 1px solid var(--accent); color: var(--accent); font: italic 18px var(--serif);
+  }
+  .brain { margin-top: 18px; border-top: 1px solid var(--hair); padding-top: 10px; }
+  .brain .cap { font-size: 10px; letter-spacing: .12em; color: var(--ink-dim); text-transform: uppercase; display: flex; justify-content: space-between; }
+
+  /* ---------- fitness strip ---------- */
+  .fitness { position: absolute; left: 28px; right: 28px; bottom: 70px; height: 0; }
+
+  /* subtle "alive" motion */
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+  @keyframes drift { 0%,100% { transform: translate(0,0) rotate(0); } 50% { transform: translate(4px,-3px) rotate(2deg); } }
+  .c-a { transform-box: fill-box; transform-origin: center; animation: drift 3.2s ease-in-out infinite; }
+  .c-b { transform-box: fill-box; transform-origin: center; animation: drift 2.7s ease-in-out infinite reverse; }
+  .muscle { animation: breathe 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes dash { to { stroke-dashoffset: -40; } }
+  .shrink { animation: dash 2s linear infinite; }
+
+  /* ---------- phone width ---------- */
+  @media (max-width: 900px) {
+    header { flex-wrap: wrap; gap: 10px 18px; padding: 14px 16px 10px; }
+    nav { margin-left: 0; order: 3; width: 100%; justify-content: space-between; }
+    main { grid-template-columns: 1fr; }
+    /* HUD pieces leave the overlay and stack in normal flow around the dish */
+    .stage { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px 20px; }
+    .hud { position: static; text-align: left !important; }
+    .tl { display: flex; justify-content: space-between; align-items: baseline; }
+    .dish { width: 100%; }
+    aside { border-left: 0; border-top: 1px solid var(--hair); }
+    .label { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">Petri <small>SPECIMEN 0412 · ×40 · DARKFIELD</small></div>
+  <nav>
+    <a href="#">Lab</a><a href="#" class="on">Evolve</a><a href="#">Fight</a><a href="#">Share</a>
+  </nav>
+  <span class="snd">snd ◦ on</span>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="hud tl">
+      <div class="clock">00:16.4</div>
+      <div class="warn">rim contracting — 0.92 r</div>
+    </div>
+    <div class="hud tr">
+      generation <b>37</b> / ind <b>58</b> of 100<br />
+      vs <b>hall of fame #12</b><br />
+      <div class="speed"><span>❙❙</span><span>1×</span><span class="on">5×</span><span>20×</span><span>50×</span></div>
+    </div>
+
+    <!-- THE DISH -->
+    <svg class="dish" viewBox="-500 -500 1000 1000" aria-label="petri dish with two creatures fighting">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="soft"><feGaussianBlur stdDeviation="14" /></filter>
+        <radialGradient id="glass" r="0.5">
+          <stop offset="0" stop-color="#0f1a2b" stop-opacity=".9" />
+          <stop offset=".85" stop-color="#0a1220" stop-opacity=".6" />
+          <stop offset="1" stop-color="#16243a" stop-opacity=".9" />
+        </radialGradient>
+        <!-- 72 tick marks round the rim, every 5 degrees -->
+        <g id="tick"><line x1="0" y1="-462" x2="0" y2="-470" stroke="#2c3d52" stroke-width="1.2" /></g>
+      </defs>
+
+      <!-- glass + rings -->
+      <circle r="470" fill="url(#glass)" stroke="#22324a" stroke-width="2" />
+      <circle r="440" fill="none" stroke="#1a2738" stroke-width="1" />
+      <g id="ticks"></g>
+      <!-- the arena edge (the "rim" you get pushed out of) -->
+      <circle r="400" fill="none" stroke="#3a5372" stroke-width="1.5" />
+      <!-- sudden death: the shrinking rim, in the warning colour -->
+      <circle class="shrink" r="368" fill="none" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="14 6" opacity=".85" />
+      <!-- faint concentric guides -->
+      <circle r="200" fill="none" stroke="#132033" stroke-dasharray="2 8" />
+      <line x1="-400" y1="0" x2="400" y2="0" stroke="#111c2c" />
+      <line x1="0" y1="-400" x2="0" y2="400" stroke="#111c2c" />
+
+      <!-- trails -->
+      <path d="M -330 250 C -290 190, -250 140, -190 100" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" opacity=".08" filter="url(#soft)" />
+      <path d="M -320 262 C -285 200, -245 150, -190 100" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" opacity=".5" />
+      <path d="M 330 -260 C 290 -200, 250 -150, 200 -100" fill="none" stroke="var(--pale)" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" opacity=".35" />
+
+      <!-- creature A: player's crab (accent colour) -->
+      <g transform="translate(-150 70) rotate(-22) scale(1.5)"><g class="c-a" filter="url(#glow)">
+        <ellipse rx="70" ry="44" fill="var(--accent)" opacity=".07" />
+        <g stroke="var(--accent)" stroke-linecap="round" fill="none">
+          <!-- bones -->
+          <path d="M -40 0 L 40 0" stroke-width="5" />
+          <path d="M 40 0 L 78 -34 L 104 -12" stroke-width="4" />
+          <path d="M 40 0 L 78 34 L 104 14" stroke-width="4" />
+          <path d="M -40 0 L -78 -30" stroke-width="3.5" />
+          <path d="M -40 0 L -78 30" stroke-width="3.5" />
+          <!-- muscles (dashed, thinner) -->
+          <g class="muscle" stroke-width="1.5" stroke-dasharray="3 3" opacity=".8">
+            <path d="M 10 0 L 78 -34" /><path d="M 10 0 L 78 34" /><path d="M -10 0 L -78 -30" />
+          </g>
+        </g>
+        <!-- joints -->
+        <g fill="var(--ground)" stroke="var(--accent)" stroke-width="2">
+          <circle cx="-40" cy="0" r="7" /><circle cx="40" cy="0" r="8" /><circle cx="78" cy="-34" r="5" />
+          <circle cx="78" cy="34" r="5" /><circle cx="104" cy="-12" r="4" /><circle cx="104" cy="14" r="4" />
+          <circle cx="-78" cy="-30" r="4" /><circle cx="-78" cy="30" r="4" />
+        </g>
+        <!-- eye / sense organ -->
+        <circle cx="52" cy="0" r="3" fill="var(--accent)" />
+      </g></g>
+
+      <!-- creature B: opponent snake (neutral pale glow) -->
+      <g transform="translate(150 -70) rotate(158) scale(1.45)"><g class="c-b" filter="url(#glow)">
+        <ellipse rx="95" ry="26" fill="var(--pale)" opacity=".05" />
+        <path d="M -90 10 Q -60 -20 -30 0 T 30 0 T 90 -8" fill="none" stroke="var(--pale)" stroke-width="4.5" stroke-linecap="round" opacity=".85" />
+        <path class="muscle" d="M -80 18 Q -60 -6 -30 10 T 30 10 T 85 4" fill="none" stroke="var(--pale)" stroke-width="1.3" stroke-dasharray="3 3" opacity=".5" />
+        <g fill="var(--ground)" stroke="var(--pale)" stroke-width="2" opacity=".9">
+          <circle cx="-90" cy="10" r="5" /><circle cx="-30" cy="0" r="6" /><circle cx="30" cy="0" r="6" /><circle cx="90" cy="-8" r="8" />
+        </g>
+        <circle cx="98" cy="-8" r="2.5" fill="var(--pale)" />
+      </g></g>
+
+      <!-- contact flash where they collide -->
+      <g transform="translate(14 -14)">
+        <circle r="20" fill="var(--pale)" opacity=".12" filter="url(#soft)" />
+        <g stroke="var(--pale)" stroke-width="1.2" opacity=".7">
+          <line x1="-14" y1="-14" x2="-22" y2="-22" /><line x1="14" y1="-12" x2="24" y2="-20" /><line x1="0" y1="18" x2="0" y2="28" />
+        </g>
+      </g>
+
+      <!-- hand-drawn annotation arrow -->
+      <path d="M -330 -250 C -300 -200, -170 -120, -20 -30" fill="none" stroke="var(--ink)" stroke-width="1" opacity=".55" stroke-dasharray="5 4" />
+      <path d="M -28 -40 L -20 -30 L -33 -29" fill="none" stroke="var(--ink)" stroke-width="1" opacity=".55" />
+      <text x="-440" y="-268" fill="var(--ink)" opacity=".75" font-family="Instrument Serif" font-style="italic" font-size="22">learned to tuck its claws, gen 31</text>
+
+      <!-- scale bar -->
+      <g transform="translate(250 430)" font-family="IBM Plex Mono" font-size="12" fill="var(--ink-dim)">
+        <line x1="0" y1="0" x2="100" y2="0" stroke="var(--ink)" stroke-width="2" />
+        <line x1="0" y1="-6" x2="0" y2="6" stroke="var(--ink)" /><line x1="50" y1="-4" x2="50" y2="4" stroke="var(--ink)" /><line x1="100" y1="-6" x2="100" y2="6" stroke="var(--ink)" />
+        <text x="112" y="4">100 µm</text>
+      </g>
+    </svg>
+
+    <!-- specimen labels (positioned over the dish on desktop) -->
+    <div class="label mine" style="left: 9%; top: 62%;">
+      <div class="name">Brachiopus vorax</div>
+      <div class="meta">YOURS · GEN 37 · FIT 0.82 · 8 PARTS</div>
+    </div>
+    <div class="label" style="right: 8%; top: 18%;">
+      <div class="name">Serpentula tenax</div>
+      <div class="meta">HALL OF FAME #12 · GEN 24</div>
+    </div>
+
+    <div class="hud bl">
+      <!-- fitness over generations: best (accent) and mean (dim) -->
+      <svg width="260" height="64" viewBox="0 0 260 64" aria-label="fitness graph">
+        <line x1="0" y1="63" x2="260" y2="63" stroke="#1d2a3b" />
+        <g stroke="#1d2a3b"><line x1="65" y1="58" x2="65" y2="63"/><line x1="130" y1="58" x2="130" y2="63"/><line x1="195" y1="58" x2="195" y2="63"/></g>
+        <polyline fill="none" stroke="#5d6f84" stroke-width="1" points="0,60 20,58 40,55 60,54 80,50 100,47 120,46 140,40 160,38 180,37 200,33 220,31 240,30 260,28" />
+        <polyline fill="none" stroke="#6ff2c8" stroke-width="1.6" points="0,56 20,50 40,48 60,40 80,38 100,36 120,35 140,24 160,22 180,21 200,16 220,15 240,12 260,10" />
+        <circle cx="140" cy="24" r="3" fill="none" stroke="#ff7a45" />
+      </svg>
+      <div>fitness · best <b>0.82</b> · mean <b>0.51</b> · <span class="warn">◦ jump at gen 28</span></div>
+    </div>
+    <div class="hud br">
+      mutation σ <b>0.18</b> · pop <b>100</b> · seed <b>0x5EED</b><br />
+      <span style="color: var(--accent)">adopt as champion ↵</span>
+    </div>
+  </section>
+
+  <aside>
+    <div class="nb-head"><h2>Lab Notebook</h2><span>P. 07 · GEN 28</span></div>
+
+    <div class="entry">
+      <h3>A sudden jump</h3>
+      <p>At generation 28 the best score leapt <em>+0.11</em>. One mutation flipped a single weight from the
+        <em>touch</em> sense to the front claw muscle — now it grips the moment it makes contact.</p>
+    </div>
+
+    <div class="entry">
+      <h3>Mutation strength</h3>
+      <p>How far children wander from their parent. Drag it and watch the same parent's offspring:</p>
+      <div class="slider"><span>gentle</span><div class="track"><div class="knob"></div></div><span>wild</span></div>
+      <div class="ba">
+        <figure>
+          <svg viewBox="0 0 120 50" width="100%"><g fill="none" stroke="#6ff2c8" stroke-width="1" opacity=".7">
+            <path d="M5 40 C30 10 60 30 115 12"/><path d="M5 38 C32 14 62 28 115 15"/><path d="M5 42 C28 12 58 34 115 10"/></g></svg>
+          <figcaption>σ 0.05 · siblings alike</figcaption>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 120 50" width="100%"><g fill="none" stroke="#ff7a45" stroke-width="1" opacity=".7">
+            <path d="M5 40 C30 0 60 50 115 6"/><path d="M5 20 C40 48 70 4 115 44"/><path d="M5 30 C25 30 90 0 115 28"/></g></svg>
+          <figcaption>σ 0.60 · chaos</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <button class="why">Why did it do that?</button>
+
+    <div class="brain">
+      <div class="cap"><span>brain · live</span><span>14 → 8 → 6</span></div>
+      <svg viewBox="0 0 290 120" width="100%" aria-label="neural network activity">
+        <g stroke="#6ff2c8" stroke-width=".8" opacity=".35">
+          <line x1="20" y1="15" x2="145" y2="25"/><line x1="20" y1="35" x2="145" y2="25"/><line x1="20" y1="55" x2="145" y2="55"/>
+          <line x1="20" y1="75" x2="145" y2="85"/><line x1="20" y1="95" x2="145" y2="55"/><line x1="20" y1="105" x2="145" y2="105"/>
+          <line x1="145" y1="25" x2="270" y2="30"/><line x1="145" y1="55" x2="270" y2="60"/><line x1="145" y1="85" x2="270" y2="60"/><line x1="145" y1="105" x2="270" y2="90"/>
+        </g>
+        <g stroke="#6ff2c8" stroke-width="2.2" opacity=".9"><line x1="20" y1="55" x2="145" y2="55"/><line x1="145" y1="55" x2="270" y2="60"/></g>
+        <g stroke="#ff7a45" stroke-width="1.6" opacity=".7"><line x1="20" y1="95" x2="145" y2="55"/></g>
+        <g fill="#060a12" stroke="#5d6f84"><circle cx="20" cy="15" r="4"/><circle cx="20" cy="35" r="4"/><circle cx="20" cy="75" r="4"/><circle cx="20" cy="105" r="4"/>
+          <circle cx="145" cy="25" r="5"/><circle cx="145" cy="85" r="5"/><circle cx="145" cy="105" r="5"/><circle cx="270" cy="30" r="5"/><circle cx="270" cy="90" r="5"/></g>
+        <g fill="#6ff2c8"><circle cx="20" cy="55" r="5"/><circle cx="145" cy="55" r="6"/><circle cx="270" cy="60" r="6"/></g>
+        <circle cx="20" cy="95" r="4" fill="#ff7a45"/>
+        <g font-family="IBM Plex Mono" font-size="8" fill="#5d6f84"><text x="28" y="58">touch</text><text x="28" y="98">rim 0.3</text><text x="212" y="52">claw L</text></g>
+      </svg>
+    </div>
+  </aside>
+</main>
+
+<script>
+  // Draw the 72 rim ticks (every 5°, longer every 30°). Only cosmetic.
+  const g = document.getElementById('ticks');
+  for (let i = 0; i < 72; i++) {
+    const a = i * 5, long = i % 6 === 0;
+    g.insertAdjacentHTML('beforeend',
+      `<line x1="0" y1="-462" x2="0" y2="${long ? -478 : -470}" stroke="${long ? '#3a5372' : '#22324a'}" stroke-width="1.2" transform="rotate(${a})" />`);
+  }
+</script>
+</body>
+</html>
