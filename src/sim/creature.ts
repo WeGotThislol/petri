@@ -12,22 +12,21 @@ export interface MuscleSpec { a: number; b: number; strength: number }
 
 /**
  * Appearance genes. They never affect physics; they only tell the renderer
- * how to paint the creature. Colours are names from the design palette
- * (see src/ui/tokens.ts), so any combination stays harmonious.
+ * how to paint the organism. Colours are pigment names from the design
+ * tokens (src/ui/tokens.ts), so any combination stays harmonious.
  */
+export type Pigment = 'verdigris' | 'rose' | 'ochre' | 'iris' | 'bone2' | 'kelp';
 export interface Look {
-  body: 'peach' | 'coral' | 'butter' | 'mint' | 'lavender' | 'sky';
-  accent: 'peach' | 'coral' | 'butter' | 'mint' | 'lavender' | 'sky';
-  pattern: 'plain' | 'spots' | 'stripes' | 'belly' | 'freckles';
-  /** Eye size multiplier, roughly 0.85 to 1.25. Big eyes = extra cute. */
-  eyes: number;
-  /** Seed for small pattern details (spot positions etc.). */
+  body: Pigment;
+  accent: Pigment;
+  pattern: 'plain' | 'bands' | 'speckles' | 'stripes' | 'gradient';
+  /** Seed for small pattern details (speckle positions etc.). */
   seed: number;
 }
 
 export interface CreatureSpec {
   name: string;
-  /** A friendly short name, e.g. "Bloop". */
+  /** A short common name, e.g. "Pincer". */
   nick?: string;
   look?: Look;
   joints: JointSpec[];
@@ -78,8 +77,8 @@ export function spawn(world: World, spec: CreatureSpec, body: number, x: number,
  */
 export const CRAB: CreatureSpec = {
   name: 'Brachiopus vorax',
-  nick: 'Bloop',
-  look: { body: 'peach', accent: 'coral', pattern: 'spots', eyes: 1.1, seed: 3 },
+  nick: 'Pincer',
+  look: { body: 'rose', accent: 'bone2', pattern: 'speckles', seed: 3 },
   head: 0,
   joints: [
     { x: 30, y: 0, r: 9 },    // 0 head
@@ -105,11 +104,11 @@ export const CRAB: CreatureSpec = {
   ],
 };
 
-/** The scripted sparring dummy: a round, heavy-ish blob with a short tail. */
+/** The Buoy: the scripted sparring dummy, a round, heavy-ish body with a short tail. */
 export const DUMMY: CreatureSpec = {
   name: 'Globulus inertis',
-  nick: 'Globby',
-  look: { body: 'sky', accent: 'lavender', pattern: 'belly', eyes: 0.9, seed: 7 },
+  nick: 'Buoy',
+  look: { body: 'bone2', accent: 'iris', pattern: 'gradient', seed: 7 },
   head: 0,
   joints: [
     { x: 26, y: 0, r: 10 },   // 0 front
@@ -138,8 +137,8 @@ export const DUMMY: CreatureSpec = {
 /** A tadpole: small round head, long whippy tail. */
 export const TADPOLE: CreatureSpec = {
   name: 'Caudata wriggla',
-  nick: 'Wriggle',
-  look: { body: 'mint', accent: 'sky', pattern: 'stripes', eyes: 1.25, seed: 11 },
+  nick: 'Lash',
+  look: { body: 'verdigris', accent: 'bone2', pattern: 'bands', seed: 11 },
   head: 0,
   joints: [
     { x: 26, y: 0, r: 11 }, { x: 6, y: -14, r: 10 }, { x: 6, y: 14, r: 10 }, { x: -14, y: 0, r: 9 },
@@ -158,8 +157,8 @@ export const TADPOLE: CreatureSpec = {
 /** A paddler (the "hopper"): a round body that rows with two big flippers. */
 export const PADDLER: CreatureSpec = {
   name: 'Remipes saltator',
-  nick: 'Hop',
-  look: { body: 'butter', accent: 'peach', pattern: 'freckles', eyes: 1.05, seed: 5 },
+  nick: 'Oar',
+  look: { body: 'ochre', accent: 'rose', pattern: 'stripes', seed: 5 },
   head: 0,
   joints: [
     { x: 22, y: 0, r: 10 }, { x: 0, y: -17, r: 10 }, { x: 0, y: 17, r: 10 }, { x: -22, y: 0, r: 10 },
@@ -178,8 +177,8 @@ export const PADDLER: CreatureSpec = {
 /** A spinner: a triangular core with three swinging arms. */
 export const SPINNER: CreatureSpec = {
   name: 'Trirotor giddius',
-  nick: 'Whirl',
-  look: { body: 'lavender', accent: 'coral', pattern: 'spots', eyes: 1.0, seed: 9 },
+  nick: 'Rotor',
+  look: { body: 'iris', accent: 'verdigris', pattern: 'speckles', seed: 9 },
   head: 0,
   joints: [
     { x: 16, y: 0, r: 11 }, { x: -8, y: -14, r: 11 }, { x: -8, y: 14, r: 11 },
@@ -197,8 +196,8 @@ export const SPINNER: CreatureSpec = {
 /** A big-clawed crab variant with a stubby tail. */
 export const SNIPPER: CreatureSpec = {
   name: 'Forcipula grandis',
-  nick: 'Snip',
-  look: { body: 'coral', accent: 'butter', pattern: 'belly', eyes: 0.95, seed: 13 },
+  nick: 'Shears',
+  look: { body: 'kelp', accent: 'ochre', pattern: 'bands', seed: 13 },
   head: 0,
   joints: [
     { x: 28, y: 0, r: 10 }, { x: 0, y: -20, r: 9 }, { x: 0, y: 20, r: 9 }, { x: -20, y: 0, r: 8 },
@@ -217,8 +216,8 @@ export const SNIPPER: CreatureSpec = {
 /** A jelly: a plump five-sided bell with two trailing tentacles. */
 export const JELLY: CreatureSpec = {
   name: 'Medusella pufficans',
-  nick: 'Puff',
-  look: { body: 'sky', accent: 'mint', pattern: 'freckles', eyes: 1.15, seed: 17 },
+  nick: 'Bell',
+  look: { body: 'iris', accent: 'rose', pattern: 'gradient', seed: 17 },
   head: 0,
   joints: [
     { x: 22, y: 0, r: 11 }, { x: 6, y: -20, r: 11 }, { x: -16, y: -13, r: 11 }, { x: -16, y: 13, r: 11 }, { x: 6, y: 20, r: 11 },
@@ -237,8 +236,8 @@ export const JELLY: CreatureSpec = {
 /** A long eel (the "snake"): tiny head, very long body. */
 export const EEL: CreatureSpec = {
   name: 'Longissimus maximus',
-  nick: 'Longboi',
-  look: { body: 'butter', accent: 'mint', pattern: 'stripes', eyes: 0.9, seed: 19 },
+  nick: 'Lamprey',
+  look: { body: 'ochre', accent: 'kelp', pattern: 'bands', seed: 19 },
   head: 0,
   joints: [
     { x: 30, y: 0, r: 9 }, { x: 12, y: -11, r: 8.5 }, { x: 12, y: 11, r: 8.5 }, { x: -6, y: 0, r: 8.5 },

@@ -1,6 +1,6 @@
 /**
  * A small hand-drawn-looking line chart of fitness per generation.
- * Best = mint line, average = soft lavender line.
+ * Best = amber line, average = faint bone line.
  */
 import { COLOR, FONT, rgba } from './tokens';
 
@@ -13,11 +13,11 @@ export function drawGraph(cv: HTMLCanvasElement, best: number[], mean: number[])
   const W = r.width, H = r.height, pad = 6;
   g.clearRect(0, 0, W, H);
   // Hand-drawn baseline.
-  g.strokeStyle = rgba(COLOR.inkFaint, 0.5); g.lineWidth = 1.5; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(pad, H - pad); g.quadraticCurveTo(W / 2, H - pad + 1.5, W - pad, H - pad - 1); g.stroke();
+  g.strokeStyle = rgba(COLOR.bone, 0.14); g.lineWidth = 1; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(pad, H - pad); g.lineTo(W - pad, H - pad); g.stroke();
   if (best.length < 2) {
-    g.fillStyle = COLOR.inkFaint; g.font = `500 16px ${FONT.hand}`;
-    g.fillText('the score graph draws itself here…', pad + 4, H / 2 + 4);
+    g.fillStyle = COLOR.inkFaint; g.font = `15px ${FONT.hand}`;
+    g.fillText('fitness, plotted as it arrives', pad + 4, H / 2 + 4);
     return;
   }
   // Zoom the y-axis to the data so small improvements are visible.
@@ -30,8 +30,8 @@ export function drawGraph(cv: HTMLCanvasElement, best: number[], mean: number[])
     vals.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
     g.stroke();
   };
-  line(mean, rgba(COLOR.lavender, 0.8), 2);
-  line(best, COLOR.mint, 3);
-  g.fillStyle = COLOR.mint;
-  g.beginPath(); g.arc(X(best.length - 1), Y(best[best.length - 1]), 4, 0, Math.PI * 2); g.fill();
+  line(mean, rgba(COLOR.bone, 0.35), 1.2);
+  line(best, COLOR.amber, 1.8);
+  g.fillStyle = COLOR.amber;
+  g.beginPath(); g.arc(X(best.length - 1), Y(best[best.length - 1]), 2.5, 0, Math.PI * 2); g.fill();
 }

@@ -1,12 +1,14 @@
 # Petri
 
-Design a micro-creature, evolve its neural-network brain by natural selection,
-then push your rivals out of the dish.
+Choose an organism, evolve its neural-network brain by natural selection,
+then push rivals out of the dish.
 
 *Work in progress: Stage 2 of 6 done.* **Play it:** https://wegotthislol.github.io/petri/ · See [docs/PLAN.md](docs/PLAN.md) for the plan
 and [docs/LEARN.md](docs/LEARN.md) for a beginner-friendly tour.
 
-![Home screen](docs/img/design-home.png)
+![Home screen](docs/img/v2-home.png)
+
+![Mid-fight](docs/img/v2-fight.png)
 
 **Evolution really works:** every generation's champion, tested on fresh seeds.
 

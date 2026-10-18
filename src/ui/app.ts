@@ -13,7 +13,7 @@ import { Brain } from '../sim/brain';
 import { DummyController, PusherController } from '../sim/controllers';
 import { EvolutionRunner, GenReport } from '../evo/runner';
 import { DEFAULT_CONFIG } from '../evo/ga';
-import { setEyeBoost } from '../render/creatureArt';
+import { toggleBioluminescence } from '../render/creatureArt';
 import { Stage } from './stage';
 import { Pedestal } from './pedestal';
 import { drawGraph } from './graph';
@@ -24,9 +24,9 @@ type Screen = 'home' | 'pick' | 'evolve' | 'fight';
 
 interface Starter { spec: CreatureSpec; blurb: string }
 const STARTERS: Starter[] = [
-  { spec: CRAB, blurb: 'Grabby. Has claws and uses them for hugs. Aggressive hugs.' },
-  { spec: TADPOLE, blurb: 'All tail, no plan. Surprisingly fast once it figures out which end is the front.' },
-  { spec: PADDLER, blurb: 'Rows with two big flippers. Very polite, until it isn\'t.' },
+  { spec: CRAB, blurb: 'Two forelimbs and a driving tail. Grips first, considers later.' },
+  { spec: TADPOLE, blurb: 'Mostly tail. Quick, once it settles which end is the front.' },
+  { spec: PADDLER, blurb: 'Rows with two broad paddles. Unhurried, and hard to move.' },
 ];
 
 const $ = <T extends HTMLElement = HTMLElement>(root: ParentNode, sel: string) => root.querySelector<T>(sel)!;
@@ -45,11 +45,11 @@ export class App {
 
   constructor(private root: HTMLElement, manual = false) {
     root.innerHTML = `
-      <canvas id="stage" aria-label="Two little creatures sumo wrestling in a petri dish"></canvas>
+      <canvas id="stage" aria-label="Two organisms wrestling in a petri dish"></canvas>
       <header class="bar">
         <button class="wordmark" id="wordmark" aria-label="Petri, home">Petri</button>
         <ol class="steps" id="steps" hidden aria-label="Your progress">
-          <li data-step="pick">pick</li><li data-step="evolve">evolve</li><li data-step="fight">fight</li>
+          <li data-step="pick"><span>I</span> Specimen</li><li data-step="evolve"><span>II</span> Evolve</li><li data-step="fight"><span>III</span> Fight</li>
         </ol>
       </header>
       <div id="screen"></div>
@@ -85,21 +85,22 @@ export class App {
   private home(el: HTMLElement): void {
     const r = this.stage.renderer;
     r.youIndex = null; r.glow = [null, null];
-    this.layoutDish('side');
-    // The background fight: two actors, hand-scripted (the note says so!).
+    this.layoutDish('hero');
+    // The background fight: two hand-scripted specimens (the field note admits it).
     this.stage.onEnd = null;
     this.stage.play(() => new Match(CRAB, DUMMY, [new PusherController(), new DummyController()], this.fightSeed++), 2.2);
     el.innerHTML = `
-      <div class="hero frame pop">
+      <div class="hero pop">
+        <span class="eyebrow">A study in natural selection</span>
         <h1>Petri</h1>
-        <p class="lede">Grow a tiny fighter. Teach it by <em>evolution</em>. Push everyone out of the dish.</p>
-        <button class="btn big" id="start">Meet your first creature</button>
-        <p class="fine">about a minute · no sign-up · works on your phone</p>
+        <p class="lede">Choose an organism. Let selection write its nervous system, one generation at a time.
+          Then put it in the dish and see what it has learned.</p>
+        <button class="btn big" id="start">Begin</button>
+        <p class="fine">About a minute. Runs entirely in your browser.</p>
       </div>
-      <aside class="maker-note hand pop" style="animation-delay:.25s">
-        hi! I made this in my second year of uni. The creatures you train really learn by themselves.*
-        <span class="sig">— the maker</span>
-        <small>*except the two in the background. They're actors.</small>
+      <aside class="field-note hand pop" style="animation-delay:.4s">
+        Nothing you evolve here is scripted. The two in the background are, and they know it.
+        <span class="sig">field journal, p. 1</span>
       </aside>`;
     $(el, '#start').onclick = () => this.go('pick');
   }
@@ -110,21 +111,21 @@ export class App {
     el.innerHTML = `
       <div class="panel frame pop pick">
         <button class="btn-quiet back" id="back">← back</button>
-        <h2>Who's your first little fighter?</h2>
-        <p class="hint hand" id="hint">tap one ↓</p>
+        <span class="eyebrow">Step I</span>
+        <h2>Choose a specimen</h2>
         <div class="pedestals" id="peds"></div>
-        <p class="blurb" id="blurb">They all start out knowing nothing. Promise.</p>
-        <button class="btn big" id="choose" disabled>Tap a creature first</button>
+        <p class="blurb" id="blurb">All three begin with random nervous systems. None of them can swim yet.</p>
+        <button class="btn big" id="choose" disabled>Select a specimen</button>
       </div>`;
     const peds = $(el, '#peds');
     const small = window.innerWidth < 560;
     this.pedestals = STARTERS.map((st, i) => {
-      const p = new Pedestal(st.spec, small ? 92 : 150);
+      const p = new Pedestal(st.spec, small ? 84 : 176);
       const b = document.createElement('button');
       b.className = 'pedestal'; b.style.setProperty('--tilt', `${(i - 1) * 1.5}deg`);
       b.setAttribute('aria-label', `${st.spec.nick}: ${st.blurb}`);
       b.appendChild(p.canvas);
-      b.insertAdjacentHTML('beforeend', `<span class="sticker"><b>${st.spec.nick}</b></span>`);
+      b.insertAdjacentHTML('beforeend', `<span class="label"><b>${st.spec.nick}</b><i>${st.spec.name}</i></span>`);
       b.onclick = () => this.choose(i, el);
       peds.appendChild(b);
       return p;
@@ -138,12 +139,11 @@ export class App {
   private choose(i: number, el: HTMLElement): void {
     this.chosen = STARTERS[i];
     el.querySelectorAll('.pedestal').forEach((b, k) => b.classList.toggle('picked', k === i));
-    this.pedestals.forEach((p, k) => { p.mood = k === i ? 'happy' : 'idle'; });
+    this.pedestals.forEach((p, k) => { p.selected = k === i; });
     $(el, '#blurb').textContent = this.chosen.blurb;
-    $(el, '#hint').style.visibility = 'hidden';
     const btn = $<HTMLButtonElement>(el, '#choose');
     btn.disabled = false;
-    btn.textContent = `Let's go with ${this.chosen.spec.nick}`;
+    btn.textContent = `Continue with ${this.chosen.spec.nick}`;
   }
 
   private animatePedestals(): void {
@@ -174,27 +174,28 @@ export class App {
       <div class="panel frame pop evolve">
         <button class="btn-quiet back" id="back">← back</button>
         <div id="pre" ${this.reports.length ? 'hidden' : ''}>
-          <h2>${nick}'s brain is brand new</h2>
-          <p>Right now it's random wiring, so ${nick} mostly twitches (that's ${nick} on the left).
-             Press the button and I'll breed <b>${DEFAULT_CONFIG.popSize} brains at a time</b>: the best fighters get to have babies,
-             the babies get tiny random changes, repeat.</p>
-          <button class="btn big" id="go">Evolve!</button>
+          <span class="eyebrow">Step II</span>
+          <h2>An untrained nervous system</h2>
+          <p>${nick}'s brain is random wiring for now; the twitching on the left is the result.
+             Evolution will test <b>${DEFAULT_CONFIG.popSize} variants at a time</b>, keep the best,
+             and breed them with small random changes.</p>
+          <button class="btn big" id="go">Evolve</button>
         </div>
         <div id="live" ${this.reports.length ? '' : 'hidden'}>
           <p class="gen"><span id="gen">Generation 1</span> <span class="num" id="genSpeed"></span></p>
           <p class="commentary" id="comment">${LOADING_LINES[Math.floor(Math.random() * LOADING_LINES.length)]}</p>
           <p class="tip" id="tip" hidden></p>
           <canvas class="graph" id="graph" aria-label="Fitness over generations"></canvas>
-          <div class="pop-dots" id="dots" aria-label="Brains that can push Globby out"></div>
-          <p class="fine" id="dotsLabel">each dot is one brain. Mint = it pushed Globby out in testing.</p>
-          <p class="wait hand" id="wait">I'll tell you when it's ready. Usually 20–40 seconds.</p>
-          <button class="btn big" id="fight" hidden>Fight!</button>
-          <button class="btn-quiet" id="tinkerToggle" ${this.evolvedOnce ? '' : 'hidden'}>Tinker</button>
+          <div class="pop-dots" id="dots" aria-label="Variants that pushed an opponent out"></div>
+          <p class="fine" id="dotsLabel">One mark per variant. Lit: it pushed an opponent out during testing.</p>
+          <p class="wait" id="wait">Usually ready within 20–40 seconds.</p>
+          <button class="btn big" id="fight" hidden>Fight</button>
+          <button class="btn-quiet" id="tinkerToggle" ${this.evolvedOnce ? '' : 'hidden'}>Parameters</button>
           <div class="tinker" id="tinker" hidden>
-            <label>How wild are the mutations? <input type="range" id="mut" min="0.05" max="1" step="0.05" value="${this.runner.evo.cfg.mutationSize}"><span class="num" id="mutVal"></span></label>
-            <label>Brains per generation <select id="popSel"><option>24</option><option>48</option><option>96</option></select></label>
+            <label>Mutation strength <input type="range" id="mut" min="0.05" max="1" step="0.05" value="${this.runner.evo.cfg.mutationSize}"><span class="num" id="mutVal"></span></label>
+            <label>Variants per generation <select id="popSel"><option>24</option><option>48</option><option>96</option></select></label>
             <label>Watch speed <select id="spd"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
-            <button class="btn-quiet" id="defaults">Undo my tinkering</button>
+            <button class="btn-quiet" id="defaults">Restore defaults</button>
           </div>
         </div>
       </div>`;
@@ -212,7 +213,7 @@ export class App {
   private wireTinker(el: HTMLElement): void {
     const runner = this.runner!;
     const mut = $<HTMLInputElement>(el, '#mut'), popSel = $<HTMLSelectElement>(el, '#popSel'), spd = $<HTMLSelectElement>(el, '#spd');
-    const label = () => { const v = +mut.value; $(el, '#mutVal').textContent = v < 0.2 ? 'gentle' : v < 0.5 ? 'medium' : 'wild!'; };
+    const label = () => { const v = +mut.value; $(el, '#mutVal').textContent = v < 0.2 ? 'conservative' : v < 0.5 ? 'moderate' : 'reckless'; };
     popSel.value = String(runner.evo.cfg.popSize); spd.value = String(this.stage.speed); label();
     $(el, '#tinkerToggle').onclick = () => { const t = $(el, '#tinker'); t.hidden = !t.hidden; };
     mut.oninput = () => { runner.configure({ mutationSize: +mut.value }); label(); };
@@ -222,7 +223,7 @@ export class App {
       runner.configure({ mutationSize: DEFAULT_CONFIG.mutationSize, popSize: DEFAULT_CONFIG.popSize });
       this.stage.speed = 1;
       mut.value = String(DEFAULT_CONFIG.mutationSize); popSel.value = String(DEFAULT_CONFIG.popSize); spd.value = '1'; label();
-      this.toast('Back to the defaults. Nothing broke.');
+      this.toast('Defaults restored.');
     };
   }
 
@@ -256,7 +257,7 @@ export class App {
     }
   }
 
-  /** Loop the current champion vs Globby on the stage, picking up newer champions each round. */
+  /** Loop the current champion vs the Buoy on the stage, picking up newer champions each round. */
   private showChampionLoop(): void {
     this.stage.onEnd = null;
     this.stage.play(() => {
@@ -276,12 +277,12 @@ export class App {
     this.evolvedOnce = true;
     this.layoutDish('center');
     const r = this.stage.renderer;
-    r.youIndex = 0; r.glow = [COLOR.butter, null];
+    r.youIndex = 0; r.glow = [COLOR.amber, null];
     el.innerHTML = `
       <div class="versus pop">
-        <span class="sticker" style="--tilt:-2deg"><b>${nick}</b><i>you · ${gens} generations of evolution</i></span>
-        <span class="vs hand">vs</span>
-        <span class="sticker" style="--tilt:2deg"><b>Globby</b><i>a sleepy dummy. Be gentle.</i></span>
+        <span class="label"><small>Yours · ${gens} generations</small><b>${nick}</b><i>${st.spec.name}</i></span>
+        <span class="vs">versus</span>
+        <span class="label right"><small>Control specimen</small><b>${DUMMY.nick}</b><i>${DUMMY.name}</i></span>
       </div>
       <div class="result frame" id="result" hidden></div>`;
     this.stage.play(() => new Match(st.spec, DUMMY, [new Brain(evo.shape, champ), new DummyController()], 1000 + this.fightSeed++), null);
@@ -290,12 +291,12 @@ export class App {
       const box = $(el, '#result');
       const won = res.winner === 0;
       box.innerHTML = won
-        ? `<h2>${nick} wins!</h2><p>${res.reason === 'ringout' ? `Pushed Globby out in ${res.time.toFixed(1)} s.` : 'Closer to the middle when the bell rang.'}
-             ${gens} generations ago, ${nick} couldn't even swim straight.</p>`
-        : `<h2>Globby wins?!</h2><p>Globby literally does nothing. ${nick} needs a few more generations, that's all.</p>`;
+        ? `<span class="eyebrow">Result</span><h2>${nick} holds the dish</h2><p>${res.reason === 'ringout' ? `The Buoy left the ring after ${res.time.toFixed(1)} s.` : 'It was nearer the centre when time ran out.'}
+             ${gens} generations ago it could not swim in a straight line.</p>`
+        : `<span class="eyebrow">Result</span><h2>The Buoy holds</h2><p>It does nothing at all, which was enough this time. A few more generations should change that.</p>`;
       box.insertAdjacentHTML('beforeend', `<div class="row-btns">
-          <button class="btn big" id="again">${won ? 'Fight again' : 'Evolve more'}</button>
-          <button class="btn-quiet" id="other">${won ? 'Evolve more' : 'Rematch'}</button></div>`);
+          <button class="btn" id="again">${won ? 'Rematch' : 'Keep evolving'}</button>
+          <button class="btn-quiet" id="other">${won ? 'Keep evolving' : 'Rematch'}</button></div>`);
       box.hidden = false; box.classList.add('pop');
       const again = () => { box.hidden = true; this.stage.restart(); };
       $(box, '#again').onclick = won ? again : () => this.go('evolve');
@@ -305,13 +306,14 @@ export class App {
 
   // ------------------------------------------------------------------ helpers
   /** Where the dish sits for each screen. On phones it always sits on top. */
-  private layoutDish(mode: 'side' | 'center' | 'back'): void {
+  private layoutDish(mode: 'hero' | 'side' | 'center' | 'back'): void {
     const phone = window.innerWidth < 760;
     const r = this.stage.renderer;
-    if (phone) r.setView(mode === 'center' ? { cx: 0.5, cy: 0.45, fill: 1 } : { cx: 0.5, cy: 0.3, fill: 0.95 });
-    else if (mode === 'side') r.setView({ cx: 0.64, cy: 0.53, fill: 0.95 });
-    else if (mode === 'back') r.setView({ cx: 0.5, cy: 0.5, fill: 1.15 });
-    else r.setView({ cx: 0.5, cy: 0.54, fill: 0.92 });
+    if (phone) r.setView(mode === 'center' ? { cx: 0.5, cy: 0.45, fill: 1.05 } : mode === 'hero' ? { cx: 0.5, cy: 0.3, fill: 1.15 } : { cx: 0.5, cy: 0.3, fill: 1 });
+    else if (mode === 'hero') r.setView({ cx: 0.68, cy: 0.5, fill: 1.35 });
+    else if (mode === 'side') r.setView({ cx: 0.64, cy: 0.53, fill: 1.02 });
+    else if (mode === 'back') r.setView({ cx: 0.5, cy: 0.5, fill: 1.2 });
+    else r.setView({ cx: 0.5, cy: 0.575, fill: 0.9 });
   }
 
   private toast(msg: string): void {
@@ -328,8 +330,8 @@ export class App {
       clicks++; clearTimeout(timer); timer = window.setTimeout(() => { clicks = 0; }, 900);
       if (clicks >= 5) {
         clicks = 0;
-        const r = this.stage.renderer; r.partyHats = !r.partyHats;
-        this.toast(r.partyHats ? 'Party mode. Obviously.' : 'Party\'s over. Back to science.');
+        const r = this.stage.renderer; r.nightDive = !r.nightDive;
+        this.toast(r.nightDive ? 'Night dive. Lights down.' : 'Surfacing.');
       } else if (clicks === 1 && this.screen !== 'home' && this.screen !== 'evolve') {
         timer = window.setTimeout(() => { if (clicks === 1) this.go('home'); clicks = 0; }, 400);
       }
@@ -337,7 +339,7 @@ export class App {
     let typed = '';
     window.addEventListener('keydown', (e) => {
       typed = (typed + e.key.toLowerCase()).slice(-4);
-      if (typed === 'blob') { const on = setEyeBoost(); this.toast(on ? 'Googly eyes: ON' : 'Googly eyes: off. Dignity restored.'); }
+      if (typed === 'sims') { const on = toggleBioluminescence(); this.toast(on ? 'Bioluminescence up. For Karl Sims, 1994.' : 'Bioluminescence down.'); }
     });
   }
 }

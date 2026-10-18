@@ -1,5 +1,13 @@
 # Changelog
 
+## Design correction (v2): warm and handmade, but grown-up
+- `docs/DESIGN.md` gains a "v2 correction" section with DO / DON'T lists; `src/ui/tokens.ts` rewritten (deep inks, muted organism pigments, amber + ember accents, Cormorant Garamond / Source Sans 3 / faint Caveat marginalia, 6–12px radii, weighty easing with no overshoot).
+- Creatures: faces removed entirely. Now translucent organisms: layered glassy flesh, a fusiform torso swept along the spine, visible inner skeleton, rim light, gene markings (bands, speckles, stripes, gradient), sensor lights that react to the real sensor inputs (amber = opponent ahead, ember = rim close, pale = touch), and a neural pulse driven by real hidden-neuron activity. Knocked-out bodies dim and drift; winners carry more light.
+- Dish: deep-sea floor, drifting marine snow, fine calibrated ring, ember contracting rim, vignette.
+- UI restyled: hairline panels, specimen labels instead of stickers, ruled I/II/III step indicator, dry copy. Starters renamed Pincer, Lash, Oar; the dummy is now the Buoy.
+- Easter eggs replaced: click the logo 5× (night dive), type "sims" (bioluminescence, for Karl Sims).
+- First-run flow unchanged in structure; first fight reached in 15–24 s (phone/desktop) in the scripted visitor test.
+
 ## Stage 2: evolution engine, anti-cheat, proof
 - Self-play vs a hall of fame (`src/evo/schedule.ts`): each brain fights Globby ×2, the latest champion, and one random older champion; fresh seeds every generation.
 - Anti-cheat in fitness: `exploit` (speed-cap abuse → 0), `idle` (−0.2), `camping` (−0.2), plus push-out vs rim-survival scoring. Flags reported per generation; commentary introduces "reward hacking".

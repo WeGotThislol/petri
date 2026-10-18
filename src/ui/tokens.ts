@@ -2,88 +2,94 @@
  * DESIGN TOKENS: the single source of truth for every colour, font, size,
  * radius, shadow and easing curve in Petri.
  *
- * Both the CSS (through custom properties like `var(--c-cream)`) and the
+ * Both the CSS (through custom properties like `var(--c-amber)`) and the
  * canvas renderer read from here, so changing a value restyles the whole app.
- * See docs/DESIGN.md for the reasoning behind each choice.
+ * See docs/DESIGN.md (section "v2 correction") for the reasoning.
  */
 
 export const COLOR = {
-  // Grounds: dusky plum-indigo, never pure black.
-  night: '#1e1a33',    // deepest background, the dish floor at its edges
-  dusk: '#29233f',     // main background
-  surface: '#342c4f',  // panels, cards, drawers
-  raised: '#3f3660',   // hovered / raised surfaces
-  line: '#5c5180',     // soft outlines, dividers
+  // Grounds: deep inks with warm plum / cool teal undertones. Never pure black.
+  abyss: '#0b0a12',    // deepest: page edges, vignette
+  ink: '#121019',      // main background
+  dish: '#141c21',     // the dish floor (a hint of deep-sea teal)
+  surface: '#1a1622',  // panels
+  raised: '#231d2d',   // hovered / raised panels
+  line: '#3a3246',     // hairlines (used at low opacity)
 
-  // Inks: warm cream, never pure white.
-  cream: '#fbefdc',    // main text
-  inkSoft: '#d9cce0',  // secondary text
-  inkFaint: '#b0a4c8', // hints, captions (≥4.5:1 on every ground)
+  // Text: warm bone, never pure white.
+  bone: '#e9e0cf',     // main text (≈15:1 on ink)
+  inkSoft: '#b9ad9d',  // secondary text
+  inkFaint: '#8d8292', // captions, hints (≥4.5:1 on ink and surface)
 
-  // The friendly palette. Each colour has ONE job in the UI; creatures may use all of them.
-  mint: '#8fe3c0',     // PRIMARY ACTION (buttons you should press), "you"
-  coral: '#ff8a7a',    // danger: the shrinking rim, knock-outs, undo
-  butter: '#ffd98a',   // champion glow, celebrations, highlights
-  peach: '#ffb894',    // warm annotations, the maker's notes
-  lavender: '#bfaeff', // learning moments (Lab Notebook, jargon tips)
-  sky: '#93ccff',      // information, opponents' stickers
+  // Accents: used sparingly so they mean something.
+  amber: '#e2a14a',    // THE primary action, "yours", winner light
+  ember: '#d4614a',    // danger: the shrinking rim, knock-outs
+
+  // Organism pigments: muted, rich, a little mineral. Creatures only.
+  verdigris: '#5fa79c',
+  rose: '#b8737c',
+  ochre: '#c59a52',
+  iris: '#8279bd',
+  bone2: '#d6c6a8',
+  kelp: '#6f9a63',
 } as const;
 
 export type ColorName = keyof typeof COLOR;
 
-/** Colours creatures may be painted in (always from the palette, so always harmonious). */
-export const CREATURE_COLORS = ['peach', 'coral', 'butter', 'mint', 'lavender', 'sky'] as const;
+/** Pigments creatures may be painted in. */
+export const CREATURE_COLORS = ['verdigris', 'rose', 'ochre', 'iris', 'bone2', 'kelp'] as const;
 export type CreatureColor = (typeof CREATURE_COLORS)[number];
 
-/**
- * Hand-picked pattern colours that look good on each body colour.
- * Patterns are painted in a lighter or deeper tint of these, never a random colour.
- */
+/** Marking colours that sit well on each body pigment (genes pick from these only). */
 export const PATTERN_PAIRS: Record<CreatureColor, CreatureColor[]> = {
-  peach: ['coral', 'butter', 'lavender'],
-  coral: ['butter', 'peach', 'lavender'],
-  butter: ['peach', 'coral', 'mint'],
-  mint: ['sky', 'butter', 'lavender'],
-  lavender: ['sky', 'coral', 'peach'],
-  sky: ['lavender', 'mint', 'butter'],
+  verdigris: ['bone2', 'iris', 'ochre'],
+  rose: ['bone2', 'ochre', 'iris'],
+  ochre: ['rose', 'bone2', 'kelp'],
+  iris: ['verdigris', 'bone2', 'rose'],
+  bone2: ['rose', 'verdigris', 'ochre'],
+  kelp: ['ochre', 'bone2', 'verdigris'],
 };
 
 export const FONT = {
-  display: '"Fraunces", "Iowan Old Style", Georgia, serif', // soft serif: headings, names
-  ui: '"Nunito", "Segoe UI", system-ui, sans-serif',        // friendly sans: everything you read
-  hand: '"Caveat", "Comic Sans MS", cursive',               // handwriting: annotations only, sparingly
-  mono: '"IBM Plex Mono", ui-monospace, monospace',         // tiny numbers only
+  display: '"Cormorant Garamond", "Iowan Old Style", Georgia, serif', // refined serif: titles, specimen names
+  ui: '"Source Sans 3", "Segoe UI", system-ui, sans-serif',          // humanist sans: everything you read
+  hand: '"Caveat", "Bradley Hand", cursive',                         // marginalia only, small and faint
+  mono: '"IBM Plex Mono", ui-monospace, monospace',                  // tiny numbers only
 };
 
-/** Google Fonts URL for the families above (loaded once in each HTML page). */
+/** Google Fonts URL for the families above (loaded once per page). */
 export const FONT_URL =
-  'https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:opsz,wght,SOFT@9..144,400..700,100&family=IBM+Plex+Mono:wght@400;500&family=Nunito:wght@400;600;700;800&display=swap';
+  'https://fonts.googleapis.com/css2?family=Caveat:wght@400;500&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400&family=Source+Sans+3:wght@400;500;600&display=swap';
 
-/** Type scale (px). A gentle 1.25 ratio. */
-export const TYPE = { xs: 12, sm: 14, md: 16, lg: 20, xl: 25, xxl: 32, hero: 56 };
+/** Type scale (px). */
+export const TYPE = { xs: 12, sm: 14, md: 16, lg: 19, xl: 24, xxl: 34, hero: 64 };
 
-/** Spacing scale (px). Generous on purpose. */
+/** Spacing scale (px). */
 export const SPACE = { xs: 4, sm: 8, md: 16, lg: 24, xl: 40, xxl: 64 };
 
-export const RADIUS = { sm: 10, md: 16, lg: 26, pill: 999 };
+/** Modest radii: crafted, not bubbly. */
+export const RADIUS = { sm: 6, md: 9, lg: 12, pill: 999 };
 
 export const SHADOW = {
-  soft: '0 6px 18px rgba(14, 10, 30, 0.35)',
-  lift: '0 12px 30px rgba(14, 10, 30, 0.45)',
-  glowButter: '0 0 28px rgba(255, 217, 138, 0.45)',
+  soft: '0 10px 30px rgba(0, 0, 0, 0.45)',
+  lift: '0 18px 48px rgba(0, 0, 0, 0.55)',
+  glowAmber: '0 0 24px rgba(226, 161, 74, 0.35)',
 };
 
+/** Weighty, purposeful easing. No overshoot anywhere in the UI. */
 export const EASE = {
-  out: 'cubic-bezier(0.22, 1, 0.36, 1)',         // settles softly
-  overshoot: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // springs a little past, then back
-  inOut: 'cubic-bezier(0.65, 0, 0.35, 1)',
+  out: 'cubic-bezier(0.16, 1, 0.3, 1)',    // arrives with momentum, settles
+  inOut: 'cubic-bezier(0.65, 0, 0.35, 1)', // deliberate transitions
 };
 
-export const DURATION = { quick: 140, base: 260, slow: 480 };
+export const DURATION = { quick: 160, base: 320, slow: 640 };
+
+/** Hairline: bone at low opacity. */
+export const HAIRLINE = 'rgba(233, 224, 207, 0.12)';
 
 /**
  * Write every token into CSS custom properties on <html>, so stylesheets can
- * use `var(--c-mint)`, `var(--f-ui)`, `var(--s-md)` and so on.
+ * use `var(--c-amber)`, `var(--f-ui)`, `var(--s-md)` and so on.
  */
 export function applyTokens(root: HTMLElement = document.documentElement): void {
   const set = (k: string, v: string) => root.style.setProperty(k, v);
@@ -95,6 +101,7 @@ export function applyTokens(root: HTMLElement = document.documentElement): void 
   for (const [k, v] of Object.entries(SHADOW)) set(`--sh-${k}`, v);
   for (const [k, v] of Object.entries(EASE)) set(`--e-${k}`, v);
   for (const [k, v] of Object.entries(DURATION)) set(`--d-${k}`, `${v}ms`);
+  set('--hairline', HAIRLINE);
 }
 
 /** Load the web fonts (adds the <link> once). */

@@ -1,55 +1,66 @@
 /**
- * Creature ART: turns a physics skeleton (joint positions) into a lovable
- * little animal. Physics and looks are deliberately separate: the sim only
- * knows points and sticks; this file paints soft skin over them.
+ * Creature ART: turns a physics skeleton (joint positions) into an elegant,
+ * slightly translucent organism. Physics and looks are deliberately separate:
+ * the sim only knows points and sticks; this file paints a body over them.
  *
- * How the "one continuous blob" works (a classic 2D trick):
- *   1. Draw every bone as a thick round-capped line, every joint as a disc,
- *      and fill the stiff triangles of the core, all in the body colour.
- *      Overlapping shapes merge into one silhouette.
- *   2. Paint patterns with 'source-atop', which only paints where skin
- *      already exists, so spots and stripes never spill outside the body.
- *   3. Draw the same shapes slightly fatter in the outline colour with
- *      'destination-over' (= behind what's there). Only a rim peeks out:
- *      one smooth outline around the whole union.
- * The creature is drawn on a scratch canvas first, then stamped onto the
- * main canvas with a soft drop shadow and a little squash-and-stretch.
+ * Layers (drawn on a scratch canvas, then stamped onto the screen):
+ *   1. Silhouette: the core is filled triangles with fat rounded edges; limbs
+ *      are tapered capsules. Overlaps merge into one smooth body.
+ *   2. Translucent flesh: a soft gradient, darker and denser in the middle.
+ *   3. Inner structure: the skeleton itself, faintly visible through the
+ *      flesh, like an X-ray of a larva.
+ *   4. Gene markings (bands, speckles, stripes, a gradient), clipped to the body
+ *      with 'source-atop' so nothing spills outside.
+ *   5. Neural pulse: a band of light that travels head → tail when the
+ *      brain is active.
+ *   6. Rim light: a thin bright edge, stronger toward the top-left light.
+ *   7. Sensor nodes: small lights on the body that brighten when that sense
+ *      fires (opponent ahead, rim close, touch). You can literally watch it sense.
+ * There are no faces: the life is in the motion.
  */
 import type { CreatureSpec, Look } from '../sim/creature';
 import { Rng } from '../sim/rng';
 import { COLOR, mix, rgba } from '../ui/tokens';
 
-export type Expression = 'idle' | 'push' | 'scared' | 'dizzy' | 'happy';
+/** What the creature is sensing right now, each 0..1 (drives the sensor lights). */
+export interface Senses { opponent: number; edge: number; touch: number }
 
 export interface ArtState {
   /** World positions of every joint, in spec order. */
   pts: [number, number][];
-  /** Where the eyes should look (world coords), e.g. the opponent. */
-  lookAt?: { x: number; y: number } | null;
-  expression: Expression;
-  /** 0 = eyes open, 1 = fully closed. */
-  blink: number;
-  /** Velocity of the body, for squash-and-stretch. */
+  /** Body velocity, for a subtle stretch along the direction of travel. */
   vel?: { x: number; y: number };
-  /** Seconds, drives idle breathing. */
+  /** Seconds; drives the neural pulse and breathing. */
   time: number;
-  /** Soft champion glow colour, or null. */
+  senses?: Senses;
+  /** Brain activity 0..1: brightness and speed of the travelling pulse. */
+  activity?: number;
+  /** 'normal', 'winner' (a little more light) or 'ko' (dimmed). */
+  state?: 'normal' | 'winner' | 'ko';
+  /** Extra soft light around the body (the champion), or null. */
   glow?: string | null;
 }
 
-const DEFAULT_LOOK: Look = { body: 'peach', accent: 'coral', pattern: 'plain', eyes: 1, seed: 1 };
+const DEFAULT_LOOK: Look = { body: 'verdigris', accent: 'bone2', pattern: 'plain', seed: 1 };
 
 let scratch: HTMLCanvasElement | null = null;
+let rimCanvas: HTMLCanvasElement | null = null;
 
-/** Easter egg: type "blob" in the game for googly eyes. Returns the new state. */
-let eyeBoost = 1;
-export function setEyeBoost(): boolean { eyeBoost = eyeBoost === 1 ? 1.7 : 1; return eyeBoost !== 1; }
+/** Easter egg: brighter bioluminescence. Returns the new state. */
+let lumBoost = 1;
+export function toggleBioluminescence(): boolean { lumBoost = lumBoost === 1 ? 1.8 : 1; return lumBoost !== 1; }
 
 /** Precomputed facts about a body's shape (cached per spec). */
 interface Anatomy {
-  tris: [number, number, number][]; // stiff triangles of bones = the plump core
-  core: boolean[];                  // is joint k part of the core?
-  degree: number[];                 // how many bones touch joint k (1 = a limb tip)
+  tris: [number, number, number][]; // stiff triangles of bones = the core
+  core: boolean[];
+  degree: number[];
+  /** Joints ordered from head to the far end: the path the neural pulse travels. */
+  spine: number[];
+  /** Joints that carry sensor lights: [opponent sensor, edge sensors…]. */
+  sensors: { opp: number; edges: number[]; touch: number[] };
+  /** Widest radius of the swept torso. */
+  torsoR: number;
 }
 const anatomyCache = new WeakMap<CreatureSpec, Anatomy>();
 
@@ -67,23 +78,36 @@ function anatomy(spec: CreatureSpec): Anatomy {
   if (!tris.length) core[spec.head] = true;
   const degree = new Array(n).fill(0);
   for (const b of spec.bones) { degree[b.a]++; degree[b.b]++; }
-  a = { tris, core, degree };
+  // Spine: breadth-first distances from the head, then the longest chain to a far joint.
+  const adj: number[][] = Array.from({ length: n }, () => []);
+  for (const b of spec.bones) { adj[b.a].push(b.b); adj[b.b].push(b.a); }
+  const dist = new Array(n).fill(-1), prev = new Array(n).fill(-1);
+  dist[spec.head] = 0;
+  const q = [spec.head];
+  while (q.length) { const u = q.shift()!; for (const v of adj[u]) if (dist[v] < 0) { dist[v] = dist[u] + 1; prev[v] = u; q.push(v); } }
+  const h = spec.joints[spec.head];
+  let far = spec.head, best = -1;
+  spec.joints.forEach((j, k) => { const d = Math.hypot(j.x - h.x, j.y - h.y); if (d > best) { best = d; far = k; } });
+  const spine: number[] = [];
+  for (let k = far; k >= 0; k = prev[k]) spine.unshift(k);
+  // Sensors: opponent sense at the head; edge senses on the two core joints furthest sideways.
+  const side = spec.joints.map((j, k) => ({ k, y: j.y })).filter((o) => core[o.k] && o.k !== spec.head).sort((p, q2) => p.y - q2.y);
+  const edges = side.length >= 2 ? [side[0].k, side[side.length - 1].k] : side.map((o) => o.k);
+  const touch = spec.joints.map((_, k) => k).filter((k) => degree[k] === 1).slice(0, 2);
+  const torsoR = Math.max(...spec.joints.map((j, k) => (core[k] ? j.r : 0))) * 1.75;
+  a = { tris, core, degree, spine, sensors: { opp: spec.head, edges, touch }, torsoR };
   anatomyCache.set(spec, a);
   return a;
 }
 
-/** Skin radius at joint k: plump in the core, slimmer on limbs, tapering at the tips. */
+/** Skin radius at joint k: full in the core, slimmer on limbs, tapering at tips. */
 function skinR(spec: CreatureSpec, an: Anatomy, k: number): number {
   const r = spec.joints[k].r;
-  if (an.core[k]) return r * 1.45;
-  return an.degree[k] <= 1 ? r * 0.8 : r * 1.0;
+  if (an.core[k]) return r * 1.25;
+  return an.degree[k] <= 1 ? r * 0.55 : r * 0.85;
 }
 
-/**
- * Trace the skin silhouette, `grow` world units fatter than normal.
- * Uses the current fillStyle. Core = filled triangles + fat rounded edges;
- * limbs = tapered capsules between two circles.
- */
+/** Trace the silhouette, `grow` units fatter (negative = thinner). Uses the current fillStyle. */
 function skin(g: CanvasRenderingContext2D, spec: CreatureSpec, P: [number, number][], grow: number): void {
   const an = anatomy(spec);
   g.lineCap = 'round'; g.lineJoin = 'round';
@@ -91,18 +115,33 @@ function skin(g: CanvasRenderingContext2D, spec: CreatureSpec, P: [number, numbe
   for (const [a, b, c] of an.tris) {
     g.beginPath(); g.moveTo(P[a][0], P[a][1]); g.lineTo(P[b][0], P[b][1]); g.lineTo(P[c][0], P[c][1]); g.closePath();
     const rr = (skinR(spec, an, a) + skinR(spec, an, b) + skinR(spec, an, c)) / 3;
-    g.lineWidth = rr * 2.3 + grow * 2; // fat rounded edges make the core a soft blob
+    g.lineWidth = Math.max(0.1, rr * 1.6 + grow * 2);
     g.fill(); g.stroke();
   }
+  // The torso: circles swept along the spine with a tapering profile (full just
+  // behind the head, thin at the tail), so the body is fusiform and bends as it swims.
+  if (an.spine.length > 1) {
+    let total = 0; const seg: number[] = [];
+    for (let i = 1; i < an.spine.length; i++) { const d = Math.hypot(P[an.spine[i]][0] - P[an.spine[i - 1]][0], P[an.spine[i]][1] - P[an.spine[i - 1]][1]); seg.push(d); total += d; }
+    const rMax = an.torsoR;
+    for (let s = 0; s <= total; s += 2.5) {
+      const t = s / total;
+      const prof = t < 0.28 ? 0.72 + 0.28 * (t / 0.28) : Math.pow(1 - (t - 0.28) / 0.72, 0.85) * 0.92 + 0.08;
+      const r = rMax * prof + grow;
+      if (r <= 0.1) continue;
+      const [x, y] = alongSpine(an.spine, P, t);
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+  }
   for (const bone of spec.bones) {
-    // Limbs leave the core slim (they shouldn't look like the body is pointy).
     const limb = !(an.core[bone.a] && an.core[bone.b]);
-    const ra = (limb && an.core[bone.a] ? spec.joints[bone.a].r : skinR(spec, an, bone.a)) + grow;
-    const rb = (limb && an.core[bone.b] ? spec.joints[bone.b].r : skinR(spec, an, bone.b)) + grow;
-    capsule(g, P[bone.a][0], P[bone.a][1], ra, P[bone.b][0], P[bone.b][1], rb);
+    const ra = (limb && an.core[bone.a] ? spec.joints[bone.a].r * 0.85 : skinR(spec, an, bone.a)) + grow;
+    const rb = (limb && an.core[bone.b] ? spec.joints[bone.b].r * 0.85 : skinR(spec, an, bone.b)) + grow;
+    capsule(g, P[bone.a][0], P[bone.a][1], Math.max(0.1, ra), P[bone.b][0], P[bone.b][1], Math.max(0.1, rb));
   }
   spec.joints.forEach((_, k) => {
-    g.beginPath(); g.arc(P[k][0], P[k][1], skinR(spec, an, k) + grow, 0, Math.PI * 2); g.fill();
+    const r = skinR(spec, an, k) + grow;
+    if (r > 0.1) { g.beginPath(); g.arc(P[k][0], P[k][1], r, 0, Math.PI * 2); g.fill(); }
   });
 }
 
@@ -117,19 +156,10 @@ function capsule(g: CanvasRenderingContext2D, ax: number, ay: number, ra: number
   g.closePath(); g.fill();
 }
 
-/** Where the face goes and how big it is: on the core, nudged toward the head. */
-function faceGeometry(spec: CreatureSpec, P: [number, number][]) {
-  const an = anatomy(spec);
-  let cx = 0, cy = 0, n = 0;
-  P.forEach(([x, y], k) => { if (an.core[k]) { cx += x; cy += y; n++; } });
-  cx /= n; cy /= n;
-  let size = 0;
-  P.forEach(([x, y], k) => { if (an.core[k]) size += Math.hypot(x - cx, y - cy) + skinR(spec, an, k); });
-  size /= n;
-  const [hx, hy] = P[spec.head];
-  let fx = hx - cx, fy = hy - cy; const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
-  const t = Math.min(fl * 0.45, size * 0.45);
-  return { cx, cy, fx, fy, size, faceX: cx + fx * t, faceY: cy + fy * t };
+function ensure(c: HTMLCanvasElement | null, W: number, H: number): HTMLCanvasElement {
+  c ??= document.createElement('canvas');
+  if (c.width < W || c.height < H) { c.width = Math.max(W, c.width); c.height = Math.max(H, c.height); }
+  return c;
 }
 
 /**
@@ -138,233 +168,180 @@ function faceGeometry(spec: CreatureSpec, P: [number, number][]) {
  */
 export function drawCreature(ctx: CanvasRenderingContext2D, spec: CreatureSpec, st: ArtState, pxPerUnit: number): void {
   const look = spec.look ?? DEFAULT_LOOK;
+  const an = anatomy(spec);
   const P = st.pts;
   const base = COLOR[look.body], accent = COLOR[look.accent];
-  const outline = mix(base, COLOR.night, 0.6);
-  const ow = Math.max(2.2, 1.6 / pxPerUnit); // outline width, at least ~1.6 px on screen
+  const ko = st.state === 'ko', win = st.state === 'winner';
 
-  // Bounding box of the creature (plus room for outline, glow and sweat drops).
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxR = 0;
   P.forEach(([x, y], k) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxR = Math.max(maxR, spec.joints[k].r); });
-  const m = maxR * 1.5 + ow + 16;
+  const m = maxR * 1.5 + 12;
   minX -= m; minY -= m; maxX += m; maxY += m;
-  const px = Math.min(pxPerUnit, 1024 / Math.max(maxX - minX, maxY - minY)); // cap scratch size
+  const px = Math.min(pxPerUnit, 1024 / Math.max(maxX - minX, maxY - minY));
   const W = Math.ceil((maxX - minX) * px), H = Math.ceil((maxY - minY) * px);
+  const view = (c: CanvasRenderingContext2D) => { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W + 2, H + 2); c.setTransform(px, 0, 0, px, -minX * px, -minY * px); };
 
-  scratch ??= document.createElement('canvas');
-  if (scratch.width < W || scratch.height < H) { scratch.width = Math.max(W, scratch.width); scratch.height = Math.max(H, scratch.height); }
+  scratch = ensure(scratch, W, H);
   const g = scratch.getContext('2d')!;
+  view(g);
+
+  // Axis of the body (head → far end), used by markings and the pulse.
+  const head = P[spec.head], tail = P[an.spine[an.spine.length - 1]];
+  let ax = head[0] - tail[0], ay = head[1] - tail[1];
+  const alen = Math.hypot(ax, ay) || 1; ax /= alen; ay /= alen;
+
+  // 1–2. Translucent flesh. Stacked, ever-thinner silhouettes: the edge stays pale and
+  // thin (light passes through), the middle gets denser and deeper, like glass or a jelly.
+  const edgeCol = mix(base, COLOR.bone, 0.25), deep = mix(base, COLOR.abyss, 0.55);
+  g.fillStyle = rgba(edgeCol, 0.38);
+  skin(g, spec, P, 0);
+  for (let i = 1; i <= 4; i++) {
+    g.fillStyle = rgba(i < 3 ? base : deep, 0.2 + i * 0.04);
+    skin(g, spec, P, -i * 1.6);
+  }
+  // A cool sheen along the body (lighter at the head end).
+  const sheen = g.createLinearGradient(head[0], head[1], tail[0], tail[1]);
+  sheen.addColorStop(0, rgba(COLOR.bone, 0.12)); sheen.addColorStop(1, rgba(COLOR.abyss, 0.18));
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = sheen; g.fillRect(minX, minY, maxX - minX, maxY - minY);
+  // 3. Inner structure: faint skeleton and joint nuclei seen through the flesh.
+  g.strokeStyle = rgba(mix(base, COLOR.bone, 0.55), 0.2); g.lineWidth = 0.9; g.lineCap = 'round';
+  g.beginPath();
+  for (const b of spec.bones) { g.moveTo(P[b.a][0], P[b.a][1]); g.lineTo(P[b.b][0], P[b.b][1]); }
+  g.stroke();
+  g.fillStyle = rgba(mix(base, COLOR.abyss, 0.3), 0.45);
+  spec.joints.forEach((j, k) => { g.beginPath(); g.arc(P[k][0], P[k][1], Math.max(1.2, j.r * 0.32), 0, Math.PI * 2); g.fill(); });
+
+  // 4. Gene markings.
+  paintMarkings(g, spec, an, P, look, base, accent, { ax, ay, head, tail, alen });
+
+  // 5. Neural pulse: light travelling head → tail.
+  const act = (st.activity ?? 0.3) * (ko ? 0.15 : 1);
+  if (act > 0.02 && an.spine.length > 1) {
+    const phase = (st.time * (0.6 + act * 1.4)) % 1;
+    const pt = alongSpine(an.spine, P, phase);
+    const r = maxR * 2.6;
+    const pg = g.createRadialGradient(pt[0], pt[1], 0, pt[0], pt[1], r);
+    pg.addColorStop(0, rgba(COLOR.bone, 0.32 * act * lumBoost)); pg.addColorStop(1, rgba(COLOR.bone, 0));
+    g.fillStyle = pg; g.fillRect(minX, minY, maxX - minX, maxY - minY);
+  }
+
+  // 6. Rim light: (body) minus (body shrunk and nudged toward the light) leaves a crescent edge.
+  rimCanvas = ensure(rimCanvas, W, H);
+  const rg = rimCanvas.getContext('2d')!;
+  view(rg);
+  rg.globalCompositeOperation = 'source-over';
+  rg.fillStyle = rgba(mix(base, COLOR.bone, 0.75), win ? 0.85 : 0.6);
+  skin(rg, spec, P, 0);
+  rg.globalCompositeOperation = 'destination-out';
+  rg.save(); rg.translate(0.7, 1.0); rg.fillStyle = '#000'; skin(rg, spec, P, -0.9); rg.restore();
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, W + 2, H + 2);
+  g.globalCompositeOperation = 'source-over';
+  g.drawImage(rimCanvas, 0, 0, W, H, 0, 0, W, H);
   g.setTransform(px, 0, 0, px, -minX * px, -minY * px);
 
-  // 1. Skin.
+  // 7. Sensor nodes (additive light, can sit on the edge of the body).
+  const s = st.senses ?? { opponent: 0, edge: 0, touch: 0 };
+  g.globalCompositeOperation = 'lighter';
+  const node = (k: number, level: number, col: string) => {
+    const [x, y] = P[k];
+    const l = (0.12 + 0.88 * level) * (ko ? 0.2 : 1) * lumBoost;
+    const r = 2.2 + level * 2.5;
+    const ng = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
+    ng.addColorStop(0, rgba(col, Math.min(1, l))); ng.addColorStop(0.35, rgba(col, 0.35 * l)); ng.addColorStop(1, rgba(col, 0));
+    g.fillStyle = ng; g.beginPath(); g.arc(x, y, r * 3.2, 0, Math.PI * 2); g.fill();
+  };
+  node(an.sensors.opp, s.opponent, COLOR.amber);
+  for (const k of an.sensors.edges) node(k, s.edge, COLOR.ember);
+  for (const k of an.sensors.touch) node(k, s.touch, COLOR.bone);
   g.globalCompositeOperation = 'source-over';
-  g.fillStyle = base;
-  skin(g, spec, P, 0);
 
-  // 2. Patterns, then a soft light from the top-left, all clipped to the skin.
-  g.globalCompositeOperation = 'source-atop';
-  const fg = faceGeometry(spec, P);
-  paintPattern(g, spec, P, look, base, accent, fg);
-  const hl = g.createRadialGradient(fg.cx - fg.size * 0.35, fg.cy - fg.size * 0.45, 0, fg.cx - fg.size * 0.35, fg.cy - fg.size * 0.45, fg.size * 1.1);
-  hl.addColorStop(0, rgba(COLOR.cream, 0.32)); hl.addColorStop(1, rgba(COLOR.cream, 0));
-  g.fillStyle = hl; g.fillRect(minX, minY, maxX - minX, maxY - minY);
-  const sh = g.createRadialGradient(fg.cx + fg.size * 0.5, fg.cy + fg.size * 0.7, 0, fg.cx + fg.size * 0.5, fg.cy + fg.size * 0.7, fg.size * 1.6);
-  sh.addColorStop(0, rgba(COLOR.night, 0.16)); sh.addColorStop(1, rgba(COLOR.night, 0));
-  g.fillStyle = sh; g.fillRect(minX, minY, maxX - minX, maxY - minY);
-
-  // 3. One continuous outline behind everything.
-  g.globalCompositeOperation = 'destination-over';
-  g.fillStyle = outline;
-  skin(g, spec, P, ow);
-
-  // 4. Face on top.
-  g.globalCompositeOperation = 'source-over';
-  drawFace(g, fg, look, st);
-
-  // Stamp onto the main canvas with shadow + squash-and-stretch + breathing.
+  // Stamp onto the main canvas: floor shadow, soft bioluminescent glow, body.
   let cx = 0, cy = 0; for (const [x, y] of P) { cx += x; cy += y; } cx /= P.length; cy /= P.length;
   ctx.save();
   ctx.translate(cx, cy);
   const v = st.vel ?? { x: 0, y: 0 };
-  const sp = Math.hypot(v.x, v.y);
-  const k = Math.min(0.12, sp / 1400);
-  const breathe = 1 + 0.018 * Math.sin(st.time * 2.6 + look.seed);
-  if (k > 0.002) {
-    const a = Math.atan2(v.y, v.x);
-    ctx.rotate(a); ctx.scale(1 + k, 1 - k * 0.7); ctx.rotate(-a);
-  }
-  ctx.scale(breathe, 1 / breathe);
+  const k = Math.min(0.06, Math.hypot(v.x, v.y) / 2500); // a whisper of stretch, not cartoon squash
+  if (k > 0.002) { const a = Math.atan2(v.y, v.x); ctx.rotate(a); ctx.scale(1 + k, 1 - k * 0.6); ctx.rotate(-a); }
   ctx.translate(-cx, -cy);
   const dw = W / px, dh = H / px;
-  if (st.glow) {
-    ctx.shadowColor = rgba(st.glow, 0.8); ctx.shadowBlur = 26 * pxPerUnit; ctx.shadowOffsetY = 0;
-    ctx.drawImage(scratch, 0, 0, W, H, minX, minY, dw, dh);
-  }
-  ctx.shadowColor = rgba(COLOR.night, 0.55);
-  ctx.shadowBlur = 10 * pxPerUnit;
-  ctx.shadowOffsetX = 2 * pxPerUnit; ctx.shadowOffsetY = 7 * pxPerUnit;
+  if (ko) ctx.globalAlpha = 0.42;
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 14 * pxPerUnit;
+  ctx.shadowOffsetX = 3 * pxPerUnit; ctx.shadowOffsetY = 9 * pxPerUnit;
+  ctx.drawImage(scratch, 0, 0, W, H, minX, minY, dw, dh);
+  ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+  const glowCol = st.glow ?? (win ? COLOR.amber : base);
+  ctx.shadowColor = rgba(glowCol, (win || st.glow ? 0.55 : 0.22) * (ko ? 0.3 : 1) * Math.min(1.4, lumBoost));
+  ctx.shadowBlur = (win || st.glow ? 30 : 16) * pxPerUnit;
   ctx.drawImage(scratch, 0, 0, W, H, minX, minY, dw, dh);
   ctx.restore();
 }
 
-function paintPattern(
-  g: CanvasRenderingContext2D, spec: CreatureSpec, P: [number, number][], look: Look,
-  base: string, accent: string, fg: ReturnType<typeof faceGeometry>,
+/** A point `t` (0..1) of the way along a chain of joints. */
+function alongSpine(spine: number[], P: [number, number][], t: number): [number, number] {
+  const seg: number[] = []; let total = 0;
+  for (let i = 1; i < spine.length; i++) { const d = Math.hypot(P[spine[i]][0] - P[spine[i - 1]][0], P[spine[i]][1] - P[spine[i - 1]][1]); seg.push(d); total += d; }
+  let goal = t * total;
+  for (let i = 0; i < seg.length; i++) {
+    if (goal <= seg[i] || i === seg.length - 1) {
+      const f = seg[i] > 0 ? Math.min(1, goal / seg[i]) : 0;
+      const a = P[spine[i]], b = P[spine[i + 1]];
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    }
+    goal -= seg[i];
+  }
+  return P[spine[0]];
+}
+
+function paintMarkings(
+  g: CanvasRenderingContext2D, spec: CreatureSpec, an: Anatomy, P: [number, number][], look: Look,
+  base: string, accent: string, axis: { ax: number; ay: number; head: [number, number]; tail: [number, number]; alen: number },
 ): void {
   const rng = new Rng(look.seed * 7919 + 1);
-  const col = mix(accent, base, 0.12);
-  const an = anatomy(spec);
+  const { ax, ay, head } = axis;
+  const px = -ay, py = ax; // across the body
   switch (look.pattern) {
-    case 'belly': {
-      // A paler oval under the face, like a frog's tummy seen from above.
-      g.fillStyle = mix(base, COLOR.cream, 0.55);
-      g.beginPath();
-      g.ellipse(fg.cx - fg.fx * fg.size * 0.25, fg.cy - fg.fy * fg.size * 0.25, fg.size * 0.62, fg.size * 0.82, Math.atan2(fg.fy, fg.fx) + Math.PI / 2, 0, Math.PI * 2);
-      g.fill();
-      break;
-    }
-    case 'stripes': {
-      // Bands across the body, perpendicular to "forward", behind the face (clipped to skin).
-      g.strokeStyle = col; g.lineCap = 'round';
-      const w = Math.max(3, fg.size * 0.22);
-      g.lineWidth = w;
-      const px = -fg.fy, py = fg.fx;
-      for (let d = fg.size * 0.55; d < fg.size * 9; d += w * 2.1) {
-        const mx = fg.cx - fg.fx * d, my = fg.cy - fg.fy * d;
-        g.beginPath(); g.moveTo(mx - px * 400, my - py * 400); g.lineTo(mx + px * 400, my + py * 400); g.stroke();
+    case 'bands': {
+      // Soft transverse bands that fade toward the tail.
+      for (let d = 10, i = 0; d < axis.alen + 30; d += 13, i++) {
+        const mx = head[0] - ax * d, my = head[1] - ay * d;
+        g.strokeStyle = rgba(accent, 0.34 * (1 - d / (axis.alen + 40)));
+        g.lineWidth = 4.5 - Math.min(3, d / 40);
+        g.beginPath(); g.moveTo(mx - px * 200, my - py * 200); g.lineTo(mx + px * 200, my + py * 200); g.stroke();
       }
       break;
     }
-    case 'spots': {
-      g.fillStyle = col;
-      spec.joints.forEach((j, k) => {
-        if (k === spec.head || Math.hypot(P[k][0] - fg.faceX, P[k][1] - fg.faceY) < fg.size * 0.7) return;
-        const n = an.core[k] ? 2 : 1;
+    case 'speckles': {
+      spec.joints.forEach((_, k) => {
+        const n = an.core[k] ? 7 : 3;
         for (let i = 0; i < n; i++) {
           const R = skinR(spec, an, k);
-          const ox = rng.range(-0.55, 0.55) * R, oy = rng.range(-0.55, 0.55) * R;
-          g.beginPath(); g.arc(P[k][0] + ox, P[k][1] + oy, j.r * rng.range(0.3, 0.45), 0, Math.PI * 2); g.fill();
+          g.fillStyle = rgba(rng.next() < 0.7 ? accent : mix(base, COLOR.abyss, 0.5), rng.range(0.35, 0.7));
+          g.beginPath(); g.arc(P[k][0] + rng.range(-0.8, 0.8) * R, P[k][1] + rng.range(-0.8, 0.8) * R, rng.range(0.5, 1.5), 0, Math.PI * 2); g.fill();
         }
       });
       break;
     }
-    case 'freckles': {
-      g.fillStyle = rgba(mix(accent, COLOR.night, 0.3), 0.7);
-      spec.joints.forEach((j, k) => {
-        const n = an.core[k] ? 5 : 2;
-        for (let i = 0; i < n; i++) {
-          g.beginPath(); g.arc(P[k][0] + rng.range(-1, 1) * j.r, P[k][1] + rng.range(-1, 1) * j.r, rng.range(0.9, 1.6), 0, Math.PI * 2); g.fill();
+    case 'stripes': {
+      // Fine lines running along every limb, like grain in wood or muscle fibre.
+      g.strokeStyle = rgba(accent, 0.4); g.lineWidth = 0.8;
+      for (const b of spec.bones) {
+        const [x1, y1] = P[b.a], [x2, y2] = P[b.b];
+        const L = Math.hypot(x2 - x1, y2 - y1); if (L < 1) continue;
+        const nx = -(y2 - y1) / L, ny = (x2 - x1) / L;
+        for (const o of [-0.45, 0, 0.45]) {
+          const w = Math.min(spec.joints[b.a].r, spec.joints[b.b].r) * o;
+          g.beginPath(); g.moveTo(x1 + nx * w, y1 + ny * w); g.lineTo(x2 + nx * w, y2 + ny * w); g.stroke();
         }
-      });
+      }
+      break;
+    }
+    case 'gradient': {
+      const gr = g.createLinearGradient(axis.head[0], axis.head[1], axis.tail[0], axis.tail[1]);
+      gr.addColorStop(0, rgba(accent, 0)); gr.addColorStop(1, rgba(accent, 0.55));
+      g.fillStyle = gr; g.fillRect(-1e4, -1e4, 2e4, 2e4);
       break;
     }
     default: break;
   }
-}
-
-function drawFace(g: CanvasRenderingContext2D, fg: ReturnType<typeof faceGeometry>, look: Look, st: ArtState): void {
-  const { fx, fy } = fg;
-  const hx = fg.faceX, hy = fg.faceY;
-  const eyeR = Math.max(3.2, fg.size * 0.24 * look.eyes * eyeBoost);
-  const sep = eyeR * 1.12;
-
-  g.save();
-  // Local frame: origin at the head, "up" (−y) points forward.
-  g.translate(hx, hy);
-  // The face stays upright on screen (like a sticker), whichever way the body turns:
-  // it reads as a face from any angle. It just slides toward the head.
-  const ang = 0;
-  void fx; void fy;
-
-  // Pupil direction in local coords.
-  let px = 0, py = -1;
-  if (st.lookAt) {
-    const dx = st.lookAt.x - hx, dy = st.lookAt.y - hy;
-    const c = Math.cos(-ang), s = Math.sin(-ang);
-    px = dx * c - dy * s; py = dx * s + dy * c;
-    const l = Math.hypot(px, py) || 1; px /= l; py /= l;
-  }
-  const ink = COLOR.night, white = COLOR.cream;
-  const lw = Math.max(1.2, eyeR * 0.32);
-
-  for (const side of [-1, 1]) {
-    const ex = side * sep, ey = 0;
-    switch (st.expression) {
-      case 'happy': {
-        g.strokeStyle = ink; g.lineWidth = lw; g.lineCap = 'round';
-        g.beginPath(); g.arc(ex, ey + eyeR * 0.35, eyeR * 0.75, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
-        g.fillStyle = rgba(COLOR.coral, 0.55);
-        g.beginPath(); g.arc(ex + side * eyeR * 0.9, ey + eyeR * 1.3, eyeR * 0.5, 0, Math.PI * 2); g.fill();
-        break;
-      }
-      case 'dizzy': {
-        g.fillStyle = white; g.beginPath(); g.arc(ex, ey, eyeR, 0, Math.PI * 2); g.fill();
-        g.strokeStyle = ink; g.lineWidth = Math.max(1, lw * 0.6);
-        g.beginPath();
-        const spin = st.time * 6 * side;
-        for (let t = 0; t < 9.5; t += 0.4) {
-          const r = (t / 9.5) * eyeR * 0.8, a = t + spin;
-          const x = ex + Math.cos(a) * r, y = ey + Math.sin(a) * r;
-          t === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
-        }
-        g.stroke();
-        break;
-      }
-      default: {
-        const big = st.expression === 'scared' ? 1.22 : 1;
-        const er = eyeR * big;
-        let open = 1 - st.blink;
-        if (st.expression === 'push') open = Math.min(open, 0.55);
-        open = Math.max(0.1, open);
-        // Eye white (an ellipse that closes from top and bottom when blinking).
-        g.fillStyle = white;
-        g.beginPath(); g.ellipse(ex, ey, er, er * open, 0, 0, Math.PI * 2); g.fill();
-        if (open > 0.2) {
-          const pr = st.expression === 'scared' ? er * 0.3 : er * 0.56;
-          const reach = er - pr - er * 0.08;
-          g.save();
-          g.beginPath(); g.ellipse(ex, ey, er, er * open, 0, 0, Math.PI * 2); g.clip();
-          g.fillStyle = ink;
-          g.beginPath(); g.arc(ex + px * reach, ey + py * reach * open, pr, 0, Math.PI * 2); g.fill();
-          g.fillStyle = white;
-          g.beginPath(); g.arc(ex + px * reach - pr * 0.35, ey + py * reach * open - pr * 0.4, Math.max(0.8, pr * 0.32), 0, Math.PI * 2); g.fill();
-          g.restore();
-        }
-        if (st.expression === 'push') {
-          // Determined brows, slanting down toward the middle.
-          g.strokeStyle = ink; g.lineWidth = lw; g.lineCap = 'round';
-          g.beginPath(); g.moveTo(ex + side * er * 0.95, ey - er * 1.05); g.lineTo(ex - side * er * 0.55, ey - er * 0.55); g.stroke();
-        }
-        break;
-      }
-    }
-  }
-
-  // Mouth, a little behind the eyes.
-  const my = eyeR * 1.55;
-  g.strokeStyle = COLOR.night; g.fillStyle = COLOR.night; g.lineWidth = Math.max(1, eyeR * 0.26); g.lineCap = 'round';
-  switch (st.expression) {
-    case 'happy':
-      g.beginPath(); g.arc(0, my - eyeR * 0.2, eyeR * 0.55, 0.1 * Math.PI, 0.9 * Math.PI); g.closePath(); g.fill();
-      break;
-    case 'scared':
-      g.beginPath(); g.ellipse(0, my, eyeR * 0.28, eyeR * 0.36, 0, 0, Math.PI * 2); g.fill();
-      // Sweat drop.
-      g.fillStyle = COLOR.sky;
-      g.beginPath(); g.arc(sep + eyeR * 1.6, -eyeR * 0.2, eyeR * 0.38, 0, Math.PI); g.lineTo(sep + eyeR * 1.6, -eyeR * 1.1); g.closePath(); g.fill();
-      break;
-    case 'push':
-      g.beginPath(); g.moveTo(-eyeR * 0.45, my); g.lineTo(eyeR * 0.45, my); g.stroke();
-      break;
-    case 'dizzy':
-      g.beginPath();
-      for (let i = 0; i <= 6; i++) { const x = -eyeR * 0.6 + (i / 6) * eyeR * 1.2, y = my + (i % 2 ? 1 : -1) * eyeR * 0.15; i ? g.lineTo(x, y) : g.moveTo(x, y); }
-      g.stroke();
-      break;
-    default:
-      g.beginPath(); g.arc(0, my - eyeR * 0.35, eyeR * 0.38, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
-  }
-  g.restore();
 }

@@ -7,10 +7,10 @@ import type { GenReport } from '../evo/runner';
 export interface Line { text: string; tip?: { word: string; meaning: string } }
 
 const SHRUGS = [
-  'tiny improvements. That is honestly how evolution usually goes.',
-  'the dice got rolled again. Some babies are worse, a few are better.',
-  'the best brains are getting a little bit pushier.',
-  'still tinkering. Nobody planned any of this, by the way.',
+  'small gains. This is what most of evolution looks like up close.',
+  'mostly worse offspring, a few slightly better ones. That turns out to be enough.',
+  'nothing dramatic. The population is drifting, slowly, toward pushier.',
+  'still searching. No one designed any of this, for the record.',
 ];
 
 /** Picks a line for generation report `r`, given everything before it. */
@@ -20,40 +20,40 @@ export function commentFor(r: GenReport, history: GenReport[], nick: string): Li
   const firstPushGen = history.findIndex((h) => h.pushers > 0);
   if (g === 1) {
     return {
-      text: `Generation 1: totally random brains. Lots of flailing. That's normal, babies are bad at everything.`,
-      tip: { word: 'generation', meaning: 'one round of: test every brain, keep the best, let them have babies.' },
+      text: `Generation 1. ${r.popSize} random nervous systems. Most are discovering that they have muscles.`,
+      tip: { word: 'Generation', meaning: 'one round of testing every variant, keeping the best, and breeding the next set from them.' },
     };
   }
   if (r.pushers > 0 && firstPushGen === history.length - 1) {
     return {
-      text: `Generation ${g}: one of them pushed Globby out! Somebody frame this. Its babies get extra copies.`,
-      tip: { word: 'selection', meaning: 'better fighters are more likely to become parents. That\'s the whole trick.' },
+      text: `Generation ${g}. One of them pushed an opponent out of the ring. Its offspring will be over-represented.`,
+      tip: { word: 'Selection', meaning: 'better fighters are more likely to become parents. That is the entire mechanism.' },
     };
   }
   const lazy = r.flags.idle + r.flags.camping;
   if (lazy > r.popSize * 1.5 && !history.slice(0, -1).some((h) => h.flags.idle + h.flags.camping > h.popSize * 1.5)) {
     return {
-      text: `Generation ${g}: lots of brains are trying to "win" by doing nothing and hoping the rim gets the other guy. I dock points for that.`,
-      tip: { word: 'reward hacking', meaning: 'when learners find a loophole in the score instead of doing what you meant. Very common. Very sneaky.' },
+      text: `Generation ${g}. A popular strategy: do nothing and let the shrinking rim deal with the opponent. Points deducted.`,
+      tip: { word: 'Reward hacking', meaning: 'when a learner exploits a loophole in the score instead of doing what was intended. Common, and instructive.' },
     };
   }
   if (prev && r.best > prev.best + 0.08) {
     return {
-      text: `Generation ${g}: big jump! A lucky mutation made someone noticeably better.`,
-      tip: { word: 'mutation', meaning: 'a small random change to a baby\'s brain wiring. Usually useless, sometimes brilliant.' },
+      text: `Generation ${g}. A sharp improvement: one mutation that happened to matter.`,
+      tip: { word: 'Mutation', meaning: 'a small random change to an offspring\'s wiring. Usually neutral or harmful; occasionally the whole story.' },
     };
   }
   if (r.pushers >= r.popSize * 0.5) {
-    return { text: `Generation ${g}: ${r.pushers} of ${r.popSize} can push Globby out now. I think ${nick} is ready. Your call!` };
+    return { text: `Generation ${g}. ${r.pushers} of ${r.popSize} variants can now clear an opponent from the ring. ${nick} is ready when you are.` };
   }
   const recent = history.slice(-4);
   if (recent.length === 4 && Math.max(...recent.map((h) => h.best)) - Math.min(...recent.map((h) => h.best)) < 0.02) {
     return {
-      text: `Generation ${g}: a little plateau. It's not stuck, it's rummaging around for the next idea.`,
-      tip: { word: 'fitness', meaning: 'the score each brain earns in its test fights. Higher = better fighter.' },
+      text: `Generation ${g}. A plateau. Not stuck; searching.`,
+      tip: { word: 'Fitness', meaning: 'the score each variant earns in its test fights. Selection only ever sees this number.' },
     };
   }
-  if (g === 2) return { text: `Generation 2: still flailing, which is completely normal for generation 2.` };
+  if (g === 2) return { text: `Generation 2. Still flailing, which is exactly what generation 2 is for.` };
   return { text: `Generation ${g}: ${SHRUGS[g % SHRUGS.length]}` };
 }
 
@@ -66,8 +66,7 @@ export function isReady(history: GenReport[]): boolean {
 }
 
 export const LOADING_LINES = [
-  'Spawning baby brains…',
-  'Untangling neurons…',
-  'Filling the dish with lukewarm water…',
-  'Explaining the rules to the creatures (they did not listen)…',
+  'Wiring forty-eight nervous systems at random…',
+  'Filling the dish…',
+  'Explaining the rules. They will not be listening.',
 ];

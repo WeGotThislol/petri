@@ -63,3 +63,52 @@ never lectures.
 - Don't: "Generation 2 complete. Mean fitness: 0.13."
 - Numbers are available, but second: in the Tinker drawer, in small mono.
 - Buttons are verbs: "Meet your first creature", "Evolve!", "Fight!", "Again".
+
+---
+
+## v2 correction: warm and handmade, but grown-up
+
+The first pass fixed "cold and mechanical" but overshot into childish. v2 keeps the
+warmth, softness, grain and human touch, and adds atmosphere and restraint.
+Reference feel: the menus of *Hades* and *Hollow Knight*, *Inside*, *Alto's Odyssey*
+at night, a deep-sea documentary. Litmus test: **could this be a screenshot from a
+premium indie game on Steam, made by one person with a lot of taste?**
+
+Everything below lives in `src/ui/tokens.ts` (v2), which supersedes the v1 tables above.
+
+### Palette
+| Token | Hex | Job |
+|---|---|---|
+| `abyss` | #0b0a12 | deepest ground, vignette |
+| `ink` | #121019 | main background |
+| `dish` | #141c21 | dish floor (deep-sea teal undertone) |
+| `surface` / `raised` | #1a1622 / #231d2d | layered panels |
+| `bone` | #e9e0cf | text (14.4:1 on ink) |
+| `inkSoft` / `inkFaint` | #b9ad9d / #8d8292 | secondary / captions (≥4.5:1) |
+| `amber` | #e2a14a | **the** primary action; "yours"; winner light |
+| `ember` | #d4614a | danger only: contracting rim, knock-outs |
+| pigments | verdigris, rose, ochre, iris, bone2, kelp | organisms only, muted and mineral |
+
+### Type
+Cormorant Garamond (display, titles, specimen names) · Source Sans 3 (all UI) ·
+Caveat only as faint, small marginalia · IBM Plex Mono for tiny numbers.
+Small-caps eyebrows (11px, 0.22em tracking) carry structure instead of colour.
+
+### DO
+- Deep ink grounds with plum/teal undertones; fine film grain; vignette.
+- Hairline borders (bone at 12%), radii 6–12px, layered translucent panels.
+- One amber primary button per screen. Ember only for danger.
+- Specimen labels: serif name, italic binomial, small-caps catalogue line, hairline rule.
+- Creatures as translucent organisms: visible inner structure, rim light, gene-driven
+  markings, glowing sensor nodes and a travelling neural pulse driven by the real brain.
+- Life through motion and weight: knocked-out bodies dim and drift; winners carry more light.
+- Easing `cubic-bezier(.16,1,.3,1)` (weighty ease-out); fades and short rises.
+- Copy: dry, understated, curious. "The Buoy holds." "A plateau. Not stuck; searching."
+
+### DON'T
+- Faces, eyes, mouths, blinking, expressions, blush, party hats, googly anything.
+- Pastel candy colours, big bubbly buttons, chunky drop shadows, stickers, tilted labels.
+- Overshoot, bounce, wobble or squash on UI.
+- Exclamation marks in UI copy, baby-talk ("little fighter", "friend"), emoji.
+- Neon cyberpunk glows or sterile lab-dashboard greys.
+- More than two accent colours on screen at once.

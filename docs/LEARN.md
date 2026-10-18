@@ -205,6 +205,22 @@ results bit for bit (the fingerprint test proves it), about 2.5× faster trainin
 
 ---
 
+## 5. Design correction: how the glassy organisms are drawn
+
+`src/render/creatureArt.ts` now draws each creature in layers on a scratch canvas:
+1. **Flesh**: the silhouette is filled several times, each time slightly *thinner* and a little
+   darker. The edge ends up pale and thin, the middle dense, which is how light behaves in glass or a jelly.
+2. **Torso**: circles swept along the *spine* (the chain of joints from head to tail, found with a
+   breadth-first search) with a tapering radius, so bodies are fish- or larva-shaped and bend as they swim.
+3. **Inner structure, markings, pulse**: painted with `source-atop` so they stay inside the body.
+   The pulse's brightness is the average |activation| of the hidden neurons, so you see the brain work.
+4. **Rim light**: on a second canvas, draw the body, then cut out a slightly smaller copy nudged toward
+   the light (`destination-out`). What remains is a thin bright crescent on the lit edge.
+5. **Sensor lights**: additive (`lighter`) glows at the head (opponent sense) and flanks (rim sense),
+   driven by the same sensor numbers the brain receives.
+
+---
+
 ## Glossary
 
 ### Git terms

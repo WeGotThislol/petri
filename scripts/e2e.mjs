@@ -27,7 +27,7 @@ tick >= 100 ? console.log(`ok  game advanced to tick ${tick}`) : fail(`game stuc
 const lit = await page.evaluate(() => {
   const c = document.querySelector('#stage'); const g = c.getContext('2d');
   const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
-  for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 150) n++; // bright warm pixels = creature skin (peach, sky…)
+  for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++; // lit pixels: creature bodies, rims, sensor lights
   return n;
 });
 lit > 200 ? console.log(`ok  canvas draws (${lit} bright pixels)`) : fail(`canvas looks blank (${lit} bright pixels)`);

@@ -66,7 +66,7 @@ export class Match {
   /** Tick of the last contact between the two creatures (-1 = never touched). */
   lastContactTick = -1;
 
-  constructor(specA: CreatureSpec, specB: CreatureSpec, private controllers: [Controller, Controller], seed: number) {
+  constructor(specA: CreatureSpec, specB: CreatureSpec, readonly controllers: [Controller, Controller], seed: number) {
     // The seed adds small random variations to the start, so each match differs
     // slightly while staying perfectly reproducible.
     const rng = new Rng(seed);

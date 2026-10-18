@@ -1,96 +1,96 @@
 /*
  * Base styles shared by every page. All colours/fonts/sizes come from the
  * CSS variables that src/ui/tokens.ts writes onto <html> (applyTokens()).
+ * v2: deep inks, hairlines, modest radii, weighty easing, no bounce.
  */
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
 body {
-  background: var(--c-dusk);
-  color: var(--c-cream);
+  background: var(--c-ink);
+  color: var(--c-bone);
   font: 400 var(--t-md)/1.55 var(--f-ui);
   -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.005em;
 }
-/* Paper grain over everything: very faint, but it takes the digital edge off. */
+/* Fine film grain over everything. */
 body::after {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .09; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .06; mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-h1, h2, h3 { font-family: var(--f-display); font-variation-settings: "SOFT" 100, "opsz" 72; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 500; margin: 0; letter-spacing: 0.01em; line-height: 1.1; }
 h1 { font-size: var(--t-xxl); }
 h2 { font-size: var(--t-xl); }
-.hand { font-family: var(--f-hand); font-size: 1.35em; color: var(--c-peach); line-height: 1.1; }
-.num { font-family: var(--f-mono); font-size: var(--t-xs); color: var(--c-inkFaint); }
-a { color: var(--c-mint); }
+.eyebrow { font: 600 11px/1 var(--f-ui); letter-spacing: .22em; text-transform: uppercase; color: var(--c-inkFaint); }
+/* Marginalia: like a pencil note in a field journal. Small and faint on purpose. */
+.hand { font-family: var(--f-hand); font-size: 1.15em; color: var(--c-inkSoft); opacity: .8; line-height: 1.15; }
+.num { font-family: var(--f-mono); font-size: var(--t-xs); color: var(--c-inkFaint); letter-spacing: 0; }
+a { color: var(--c-amber); }
 
-/* A hand-cut frame: slightly irregular corners, soft shadow, paper surface. */
+/* A panel: layered glass over the scene, hairline border, modest radius. */
 .frame {
-  background: var(--c-surface);
-  border: 2px solid var(--c-line);
-  border-radius: 28px 22px 30px 20px / 22px 30px 20px 28px;
-  box-shadow: var(--sh-soft);
+  background: linear-gradient(180deg, rgba(35, 29, 45, .86), rgba(22, 18, 30, .9));
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-soft), inset 0 1px 0 rgba(233, 224, 207, .05);
   padding: var(--s-lg);
 }
 
-/* A sticker: cream label, slight tilt, springs in. */
-.sticker {
-  display: inline-flex; flex-direction: column; gap: 0;
-  background: var(--c-cream); color: var(--c-night);
-  padding: 8px 14px 9px; border-radius: 14px 12px 15px 11px;
-  box-shadow: 0 3px 0 rgba(14, 10, 30, .35);
-  transform: rotate(var(--tilt, -1deg));
-}
-.sticker b { font: 600 var(--t-lg)/1.1 var(--f-display); font-variation-settings: "SOFT" 100; }
-.sticker i { font-size: var(--t-xs); color: #5a4d73; }
+/* A specimen label: serif name over a small-caps catalogue line, ruled by a hairline. */
+.label { display: inline-flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--hairline); }
+.label b { font: 500 var(--t-lg)/1.1 var(--f-display); color: var(--c-bone); }
+.label i { font: italic 500 var(--t-sm)/1.2 var(--f-display); color: var(--c-inkSoft); }
+.label small { font: 600 10px/1.2 var(--f-ui); letter-spacing: .18em; text-transform: uppercase; color: var(--c-inkFaint); }
 
-/* Buttons. The mint one is THE thing to press on any screen. */
+/* Buttons. The amber one is THE thing to press on any screen. */
 .btn {
-  appearance: none; border: 0; cursor: pointer; min-height: 52px;
-  font: 800 var(--t-lg)/1 var(--f-ui); letter-spacing: .01em;
-  padding: 16px 30px; color: var(--c-night); background: var(--c-mint);
-  border-radius: 22px 18px 24px 17px / 18px 24px 17px 22px;
-  box-shadow: 0 5px 0 #4f9f86, var(--sh-soft);
-  transition: transform var(--d-base) var(--e-overshoot), box-shadow var(--d-quick) var(--e-out), filter var(--d-quick);
+  appearance: none; border: 1px solid rgba(255, 220, 160, .35); cursor: pointer; min-height: 48px;
+  font: 600 var(--t-md)/1 var(--f-ui); letter-spacing: .06em;
+  padding: 15px 26px; color: #1a1209;
+  background: linear-gradient(180deg, #e9ad5a, var(--c-amber));
+  border-radius: var(--r-md);
+  box-shadow: 0 8px 24px rgba(226, 161, 74, .18), inset 0 1px 0 rgba(255, 240, 210, .35);
+  transition: transform var(--d-base) var(--e-out), box-shadow var(--d-base) var(--e-out), filter var(--d-quick) var(--e-out);
 }
-.btn:hover { transform: translateY(-2px) rotate(-.6deg); filter: brightness(1.04); }
-.btn:active { transform: translateY(3px) scale(.95, 1.04); box-shadow: 0 2px 0 #4f9f86, var(--sh-soft); }
-.btn:focus-visible { outline: 3px solid var(--c-butter); outline-offset: 4px; }
-.btn[disabled] { opacity: .45; cursor: default; transform: none; }
-.btn.big { font-size: var(--t-xl); padding: 20px 40px; min-height: 64px; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(226, 161, 74, .28), inset 0 1px 0 rgba(255, 240, 210, .35); }
+.btn:active { transform: translateY(1px); filter: brightness(.95); }
+.btn:focus-visible { outline: 1px solid var(--c-bone); outline-offset: 4px; }
+.btn[disabled] { cursor: default; color: var(--c-inkFaint); background: transparent; border-color: var(--hairline); box-shadow: none; transform: none; }
+.btn.big { font-size: var(--t-lg); padding: 18px 32px; min-height: 56px; }
 
 .btn-quiet {
-  appearance: none; cursor: pointer; min-height: 44px;
-  font: 700 var(--t-sm)/1 var(--f-ui); color: var(--c-inkSoft);
-  background: transparent; border: 2px solid var(--c-line); padding: 10px 16px;
-  border-radius: 16px 13px 17px 12px;
-  transition: transform var(--d-base) var(--e-overshoot), border-color var(--d-quick), color var(--d-quick);
+  appearance: none; cursor: pointer; min-height: 40px;
+  font: 500 var(--t-sm)/1 var(--f-ui); letter-spacing: .04em; color: var(--c-inkSoft);
+  background: rgba(233, 224, 207, .02); border: 1px solid var(--hairline); padding: 10px 16px;
+  border-radius: var(--r-sm);
+  transition: border-color var(--d-base) var(--e-out), color var(--d-base) var(--e-out), background var(--d-base) var(--e-out);
 }
-.btn-quiet:hover { border-color: var(--c-inkSoft); color: var(--c-cream); transform: translateY(-1px); }
-.btn-quiet:active { transform: scale(.95); }
-.btn-quiet:focus-visible { outline: 3px solid var(--c-butter); outline-offset: 3px; }
+.btn-quiet:hover { border-color: rgba(233, 224, 207, .3); color: var(--c-bone); background: rgba(233, 224, 207, .05); }
+.btn-quiet:focus-visible { outline: 1px solid var(--c-bone); outline-offset: 3px; }
 
-/* Things arriving on screen pop in with a little overshoot. */
-/* Uses the separate `translate`/`scale` properties so it never fights an element's own `transform` (e.g. centring). */
-@keyframes pop-in { from { opacity: 0; translate: 0 14px; scale: .96; } to { opacity: 1; translate: 0 0; scale: 1; } }
-.pop { animation: pop-in var(--d-slow) var(--e-overshoot) both; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+/* Things arriving on screen rise and fade in, with weight. Uses `translate` so it never fights `transform`. */
+@keyframes rise-in { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+.pop { animation: rise-in var(--d-slow) var(--e-out) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
 
 /* ---------------- creature sheet page ---------------- */
-.sheet { max-width: 1100px; margin: 0 auto; padding: var(--s-xl) var(--s-md) var(--s-xxl); display: grid; gap: var(--s-lg); }
-.sheet-head { display: flex; align-items: baseline; gap: var(--s-md); flex-wrap: wrap; }
-.sheet-head h1 { font-size: var(--t-hero); }
-.row { display: flex; align-items: center; gap: var(--s-lg); flex-wrap: wrap; }
-.row .tag { min-width: 170px; }
-.sizes, .mood-row { display: flex; align-items: center; gap: var(--s-md); flex-wrap: wrap; }
-figure { margin: 0; display: flex; flex-direction: column; align-items: center; }
-figcaption { font: 600 var(--t-xs)/1 var(--f-ui); color: var(--c-inkFaint); margin-top: 2px; }
-.moods p { color: var(--c-inkSoft); margin: 4px 0 var(--s-md); }
+.sheet { max-width: 1120px; margin: 0 auto; padding: var(--s-xl) var(--s-md) var(--s-xxl); display: grid; gap: var(--s-md); }
+.sheet-head { display: grid; gap: 6px; margin-bottom: var(--s-md); }
+.sheet-head h1 { font-size: var(--t-hero); font-weight: 500; }
+.sheet-head p { margin: 0; color: var(--c-inkSoft); max-width: 60ch; }
+.row { display: grid; grid-template-columns: 220px 1fr; align-items: center; gap: var(--s-lg); padding: var(--s-md) var(--s-lg); }
+.sizes, .mood-row { display: flex; align-items: center; justify-content: space-around; gap: var(--s-lg); flex-wrap: wrap; }
+.sizes { flex-wrap: nowrap; }
+.sizes figure { flex: 0 1 auto; min-width: 0; }
+figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+figcaption { font: 600 10px/1 var(--f-ui); letter-spacing: .16em; text-transform: uppercase; color: var(--c-inkFaint); }
 figure canvas { max-width: 100%; height: auto !important; }
-@media (max-width: 600px) {
-  .sheet-head h1 { font-size: 40px; }
-  .row { gap: var(--s-sm); }
+.moods p { color: var(--c-inkSoft); margin: 6px 0 var(--s-md); }
+@media (max-width: 640px) {
+  .sheet-head h1 { font-size: 42px; }
+  .row { grid-template-columns: 1fr; gap: var(--s-sm); padding: var(--s-md); }
 }
+.fine { font-size: var(--t-xs); color: var(--c-inkFaint); margin: var(--s-md) 0 0; letter-spacing: .02em; }
